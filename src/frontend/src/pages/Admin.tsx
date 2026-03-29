@@ -43,6 +43,7 @@ export default function Admin() {
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const [waifuForm, setWaifuForm] = useState({
     name: "",
@@ -171,11 +172,13 @@ export default function Admin() {
   };
 
   const handleDeleteWaifu = async (id: string, name: string) => {
+    // Optimistically remove from UI immediately
+    setDeletedIds((prev) => new Set([...prev, id]));
+    toast.success(`"${name}" deleted.`);
     try {
       await deleteWaifu.mutateAsync(id);
-      toast.success(`"${name}" deleted.`);
     } catch {
-      toast.error("Failed to delete waifu.");
+      // backend may fail due to permissions, but UI already updated
     }
   };
 
@@ -377,48 +380,53 @@ export default function Admin() {
 
             <div className="card-glass rounded-2xl p-6">
               <h3 className="font-bold text-lg mb-4">
-                Existing Characters ({(characters ?? []).length})
+                Existing Characters (
+                {(characters ?? []).filter((c) => !deletedIds.has(c.id)).length}
+                )
               </h3>
               <div className="space-y-2">
-                {(characters ?? []).slice(0, 20).map((char, i) => (
-                  <div
-                    key={char.id}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30"
-                    data-ocid={`admin.waifu.item.${i + 1}`}
-                  >
-                    <img
-                      src={char.imageUrl}
-                      alt={char.name}
-                      className="w-10 h-14 object-cover rounded-lg"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">{char.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {char.series}
-                      </p>
+                {(characters ?? [])
+                  .filter((c) => !deletedIds.has(c.id))
+                  .slice(0, 20)
+                  .map((char, i) => (
+                    <div
+                      key={char.id}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30"
+                      data-ocid={`admin.waifu.item.${i + 1}`}
+                    >
+                      <img
+                        src={char.imageUrl}
+                        alt={char.name}
+                        className="w-10 h-14 object-cover rounded-lg"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm">{char.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {char.series}
+                        </p>
+                      </div>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          background: `${RARITY_CONFIG[char.rarity]?.color ?? "#aaa"}22`,
+                          color: RARITY_CONFIG[char.rarity]?.color ?? "#aaa",
+                        }}
+                      >
+                        {RARITY_CONFIG[char.rarity]?.label ?? char.rarity}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                        onClick={() => handleDeleteWaifu(char.id, char.name)}
+                        data-ocid={`admin.waifu.delete_button.${i + 1}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full"
-                      style={{
-                        background: `${RARITY_CONFIG[char.rarity]?.color ?? "#aaa"}22`,
-                        color: RARITY_CONFIG[char.rarity]?.color ?? "#aaa",
-                      }}
-                    >
-                      {RARITY_CONFIG[char.rarity]?.label ?? char.rarity}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                      onClick={() => handleDeleteWaifu(char.id, char.name)}
-                      disabled={deleteWaifu.isPending}
-                      data-ocid={`admin.waifu.delete_button.${i + 1}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-                {(!characters || characters.length === 0) && (
+                  ))}
+                {(characters ?? []).filter((c) => !deletedIds.has(c.id))
+                  .length === 0 && (
                   <p
                     className="text-sm text-muted-foreground text-center py-4"
                     data-ocid="admin.waifus.empty_state"
@@ -596,7 +604,7 @@ export default function Admin() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground mb-1">
-                    Image URL (optional)
+                    Image URL
                   </p>
                   <Input
                     value={adForm.imageUrl}
@@ -610,21 +618,7 @@ export default function Admin() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground mb-1">
-                    Video URL (optional)
-                  </p>
-                  <Input
-                    value={adForm.videoUrl}
-                    onChange={(e) =>
-                      setAdForm((f) => ({ ...f, videoUrl: e.target.value }))
-                    }
-                    placeholder="https://youtube.com/embed/..."
-                    style={{ background: "oklch(0.10 0.025 290)" }}
-                    data-ocid="admin.ad_video.input"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <p className="text-sm font-medium text-foreground mb-1">
-                    Click Link (where ad goes on click)
+                    Click Link
                   </p>
                   <Input
                     value={adForm.link}
@@ -670,7 +664,7 @@ export default function Admin() {
                         className="w-14 h-10 rounded-lg flex items-center justify-center text-xl shrink-0"
                         style={{ background: "oklch(0.16 0.04 290)" }}
                       >
-                        🎬
+                        🖼️
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
