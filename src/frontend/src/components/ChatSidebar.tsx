@@ -2,6 +2,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import {
   BookUser,
   MessageCircle,
+  Phone,
   Plus,
   Search,
   Settings,
@@ -336,12 +337,28 @@ export default function ChatSidebar({
                         >
                           {group.name}
                         </span>
-                        <span
-                          className="text-xs ml-2 flex-shrink-0"
-                          style={{ color: "#4a6278" }}
-                        >
-                          {group.members.length} members
-                        </span>
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toast.success(
+                                "📞 Group call started! Share the group ID to invite members.",
+                              );
+                            }}
+                            className="w-6 h-6 rounded-full flex items-center justify-center transition-all hover:brightness-125"
+                            style={{ background: "#1c3a20", color: "#3b9e5a" }}
+                            title="Start Call"
+                          >
+                            <Phone className="w-3 h-3" />
+                          </button>
+                          <span
+                            className="text-xs"
+                            style={{ color: "#4a6278" }}
+                          >
+                            {group.members.length}
+                          </span>
+                        </div>
                       </div>
                       <p
                         className="text-xs truncate"

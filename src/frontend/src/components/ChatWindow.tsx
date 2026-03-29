@@ -5,6 +5,7 @@ import {
   Info,
   Mic,
   Paperclip,
+  Phone,
   Send,
   X,
 } from "lucide-react";
@@ -381,7 +382,15 @@ export default function ChatWindow({
     }
   });
   const [botMessages, setBotMessages] = useState<BotMessage[]>([]);
-  const [botsActive, setBotsActive] = useState(false);
+  // Load botsActive from localStorage per group so it persists when user goes offline
+  const [botsActive, setBotsActive] = useState<boolean>(() => {
+    try {
+      const key = `sinzhu_bots_active_${groupName ?? "global"}`;
+      return localStorage.getItem(key) === "true";
+    } catch {
+      return false;
+    }
+  });
   const botsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [mentionDropdown, setMentionDropdown] = useState(false);
@@ -502,7 +511,13 @@ export default function ChatWindow({
 
   const triggerWaifuSpawn = async () => {
     if (!groupName) return;
-    const waifuPool = uploadedWaifus.length > 0 ? uploadedWaifus : SEED_WAIFUS;
+    if (uploadedWaifus.length === 0) {
+      addBotMessage(
+        "⚠️ Koi waifu upload nahi hai abhi — admin se waifus upload karne ko kaho!",
+      );
+      return;
+    }
+    const waifuPool = uploadedWaifus;
     try {
       const waifu = await huntWaifu.mutateAsync(groupName);
       const spawned =
@@ -1074,6 +1089,12 @@ export default function ChatWindow({
             );
           } else {
             setBotsActive(true);
+            try {
+              localStorage.setItem(
+                `sinzhu_bots_active_${groupName ?? "global"}`,
+                "true",
+              );
+            } catch {}
             addBotMessage(
               "🎉 Anime Bot Party MODE ON!\n\n12 anime bots join ho gaye group mein! Ab woh aapas mein anime ki baatein karenge — Hinglish aur English mein~ 🍥⚡🌸\n\n/off likhne se band ho jaayenge!",
             );
@@ -1121,6 +1142,12 @@ export default function ChatWindow({
             );
           } else {
             setBotsActive(false);
+            try {
+              localStorage.setItem(
+                `sinzhu_bots_active_${groupName ?? "global"}`,
+                "false",
+              );
+            } catch {}
             addBotMessage(
               "😴 Anime bots sone chale gaye... Group wapas quiet ho gaya~\n\n/on likhne se wapas aa jaayenge! 👋",
             );
@@ -1295,15 +1322,51 @@ export default function ChatWindow({
         </div>
 
         {isGroup && (
-          <button
-            type="button"
-            onClick={() => setShowInfo(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-full"
-            style={{ color: "#8eacbb" }}
-            data-ocid="chat.info.button"
-          >
-            <Info className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                addBotMessage(
+                  "📞 Group call shuru ho gaya! Sabhi members join kar sakte hain. ANIME_BOTS join kar rahe hain...",
+                );
+                setTimeout(() => {
+                  ANIME_BOTS.slice(0, 3).forEach((bot, i) => {
+                    setTimeout(
+                      () => {
+                        setBotMessages((prev) => [
+                          ...prev,
+                          {
+                            id: `call-join-${Date.now()}-${i}`,
+                            content: `📞 ${bot.avatar} ${bot.name} ne call join kiya!`,
+                            timestamp: Date.now(),
+                            senderName: "🍀 sɪɴᴢʜᴜ ᴡᴀɪғᴜ ʙᴏᴛ 🍭",
+                            isUserMessage: true,
+                            isOwn: false,
+                          },
+                        ]);
+                      },
+                      (i + 1) * 1500,
+                    );
+                  });
+                }, 500);
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-all hover:brightness-125"
+              style={{ background: "#1c3a20", color: "#3b9e5a" }}
+              data-ocid="chat.call.button"
+              title="Start Group Call"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInfo(true)}
+              className="w-8 h-8 flex items-center justify-center rounded-full"
+              style={{ color: "#8eacbb" }}
+              data-ocid="chat.info.button"
+            >
+              <Info className="w-5 h-5" />
+            </button>
+          </div>
         )}
       </div>
 
