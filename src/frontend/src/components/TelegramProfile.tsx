@@ -12,6 +12,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../backend";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAcceptFriendRequest,
@@ -21,10 +22,41 @@ import {
   useSaveProfile,
   useUserHarem,
 } from "../hooks/useQueries";
+import GoogleLoginModal from "./GoogleLoginModal";
 
 interface TelegramProfileProps {
   onBack: () => void;
   onNavigate: (page: string) => void;
+}
+
+function GoogleColorIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Google"
+    >
+      <path
+        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+        fill="#4285F4"
+      />
+      <path
+        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+        fill="#34A853"
+      />
+      <path
+        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
 }
 
 export default function TelegramProfile({
@@ -32,6 +64,7 @@ export default function TelegramProfile({
   onNavigate,
 }: TelegramProfileProps) {
   const { identity, login, clear } = useInternetIdentity();
+  const googleAuth = useGoogleAuth();
   const { data: profile } = useCallerProfile();
   const { data: harem = [] } = useUserHarem(identity?.getPrincipal() ?? null);
   const { data: isAdmin } = useIsAdmin();
@@ -47,39 +80,115 @@ export default function TelegramProfile({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [copiedPrincipal, setCopiedPrincipal] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isGoogleUser = !!googleAuth.user && !identity;
+  const isLoggedIn = !!identity || !!googleAuth.user;
+
+  // Initialize form from backend profile (Internet Identity users)
+  // Prefer localStorage values over backend when they exist
   useEffect(() => {
-    if (profile) {
+    if (profile && identity) {
+      const local = (() => {
+        try {
+          return JSON.parse(localStorage.getItem("sinzhu_profile") || "null");
+        } catch {
+          return null;
+        }
+      })();
       setForm({
-        username: profile.username,
-        displayName: profile.displayName,
-        bio: profile.bio,
+        username: local?.username ?? profile.username,
+        displayName: local?.displayName ?? profile.displayName,
+        bio: local?.bio ?? profile.bio,
       });
     }
-  }, [profile]);
+  }, [profile, identity]);
+
+  // Initialize form from localStorage (Google users)
+  useEffect(() => {
+    if (googleAuth.user && !identity) {
+      try {
+        const local = JSON.parse(
+          localStorage.getItem("sinzhu_profile") || "null",
+        );
+        if (local) {
+          setForm({
+            username: local.username || "",
+            displayName: local.displayName || googleAuth.user.name,
+            bio: local.bio || "",
+          });
+        } else {
+          setForm({
+            username: googleAuth.user.email.split("@")[0],
+            displayName: googleAuth.user.name,
+            bio: "",
+          });
+        }
+      } catch {
+        setForm({
+          username: googleAuth.user.email.split("@")[0],
+          displayName: googleAuth.user.name,
+          bio: "",
+        });
+      }
+    }
+  }, [googleAuth.user, identity]);
 
   const principalStr = identity?.getPrincipal().toString() ?? "";
 
   const handleSave = async () => {
-    if (!profile) return;
-    try {
-      await saveProfile.mutateAsync({
-        ...profile,
-        username: form.username,
-        displayName: form.displayName,
-        bio: form.bio,
-      });
-      toast.success("Profile updated! ✨");
-      setEditing(false);
-    } catch {
-      toast.error("Failed to save.");
+    // Always save to localStorage
+    const saved = {
+      username: form.username,
+      displayName: form.displayName,
+      bio: form.bio,
+    };
+    localStorage.setItem("sinzhu_profile", JSON.stringify(saved));
+    // Only call backend if Internet Identity
+    if (profile && identity) {
+      try {
+        await saveProfile.mutateAsync({
+          ...profile,
+          username: form.username,
+          displayName: form.displayName,
+          bio: form.bio,
+        });
+      } catch {
+        // localStorage save already happened, so we just show success
+      }
     }
+    toast.success("Profile updated! ✨");
+    setEditing(false);
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile) return;
+    if (!file) return;
+
+    // Google user: save as base64 in localStorage
+    if (isGoogleUser && !identity) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        try {
+          const existing = JSON.parse(
+            localStorage.getItem("sinzhu_profile") || "{}",
+          );
+          existing.picture = base64;
+          localStorage.setItem("sinzhu_profile", JSON.stringify(existing));
+          // Force re-render
+          setForm((f) => ({ ...f }));
+          toast.success("Photo updated! 📸");
+        } catch {}
+      };
+      reader.readAsDataURL(file);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // Internet Identity user: use backend blob upload
+    if (!profile) return;
     try {
       setUploadProgress(0);
       const arrayBuffer = await file.arrayBuffer();
@@ -122,11 +231,27 @@ export default function TelegramProfile({
   };
 
   let picUrl = "";
-  try {
-    picUrl = profile?.profilePic?.getDirectURL?.() || "";
-  } catch {}
+  if (isGoogleUser) {
+    // Check localStorage for custom uploaded photo first
+    try {
+      const local = JSON.parse(
+        localStorage.getItem("sinzhu_profile") || "null",
+      );
+      picUrl = local?.picture || googleAuth.user?.picture || "";
+    } catch {
+      picUrl = googleAuth.user?.picture || "";
+    }
+  } else {
+    try {
+      picUrl = profile?.profilePic?.getDirectURL?.() || "";
+    } catch {}
+  }
 
-  const displayName = form.displayName || form.username || "User";
+  const displayName =
+    form.displayName ||
+    form.username ||
+    (isGoogleUser ? googleAuth.user?.name : "User") ||
+    "User";
   const avatarLetter = displayName[0]?.toUpperCase() ?? "U";
   const coins = profile ? Number(profile.balance) : 0;
 
@@ -150,7 +275,7 @@ export default function TelegramProfile({
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="font-bold text-white flex-1">Profile</h1>
-        {profile && !editing && (
+        {isLoggedIn && !editing && (
           <button
             type="button"
             onClick={() => setEditing(true)}
@@ -175,23 +300,68 @@ export default function TelegramProfile({
         )}
       </div>
 
-      {!identity ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
-          <div className="text-4xl">👤</div>
-          <p className="font-semibold" style={{ color: "#8eacbb" }}>
-            Please login to view your profile
-          </p>
+      {!isLoggedIn ? (
+        /* ===== NOT LOGGED IN ===== */
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex-1 flex flex-col items-center justify-center gap-5 px-6"
+        >
+          <div className="text-5xl">👤</div>
+          <div className="flex flex-col items-center gap-1">
+            <p className="font-semibold text-white">Sign in to your profile</p>
+            <p className="text-sm text-center" style={{ color: "#8eacbb" }}>
+              Customize your profile, collect waifus, and more
+            </p>
+          </div>
+
+          {/* Google login button */}
+          <button
+            type="button"
+            onClick={() => setShowGoogleModal(true)}
+            data-ocid="profile.google.button"
+            className="w-full flex items-center justify-center gap-3 rounded-xl py-3 font-semibold text-sm transition-all hover:shadow-lg active:scale-95"
+            style={{
+              background: "#ffffff",
+              color: "#3c4043",
+              maxWidth: 300,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+            }}
+          >
+            <GoogleColorIcon size={18} />
+            Continue with Google
+          </button>
+
+          {/* Divider */}
+          <div
+            className="flex items-center gap-3 w-full"
+            style={{ maxWidth: 300 }}
+          >
+            <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
+            <span className="text-xs" style={{ color: "#4a6278" }}>
+              or
+            </span>
+            <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
+          </div>
+
+          {/* Internet Identity login */}
           <button
             type="button"
             onClick={login}
-            className="px-6 py-2.5 rounded-xl font-bold text-white"
-            style={{ background: "#5288c1" }}
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 font-semibold text-sm transition-opacity hover:opacity-90 active:opacity-75"
+            style={{
+              background: "#2481cc",
+              color: "#ffffff",
+              maxWidth: 300,
+            }}
             data-ocid="profile.login.button"
           >
-            Login
+            🔑 Login with Internet Identity
           </button>
-        </div>
+        </motion.div>
       ) : (
+        /* ===== LOGGED IN ===== */
         <div className="flex flex-col items-center px-4 py-6 gap-4">
           {/* Avatar */}
           <div className="relative">
@@ -209,29 +379,32 @@ export default function TelegramProfile({
                 avatarLetter
               )}
             </div>
-            <div className="absolute -bottom-1 right-0 flex gap-1">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: "#5288c1" }}
-                data-ocid="profile.photo.upload_button"
-              >
-                <Camera className="w-4 h-4 text-white" />
-              </button>
-              {picUrl && (
+            {/* Show upload/delete for all logged-in users */}
+            {isLoggedIn && (
+              <div className="absolute -bottom-1 right-0 flex gap-1">
                 <button
                   type="button"
-                  onClick={handleDeletePhoto}
-                  disabled={deletingPhoto}
+                  onClick={() => fileInputRef.current?.click()}
                   className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "#c15252" }}
-                  data-ocid="profile.photo.delete_button"
+                  style={{ background: "#5288c1" }}
+                  data-ocid="profile.photo.upload_button"
                 >
-                  <Trash2 className="w-4 h-4 text-white" />
+                  <Camera className="w-4 h-4 text-white" />
                 </button>
-              )}
-            </div>
+                {picUrl && identity && (
+                  <button
+                    type="button"
+                    onClick={handleDeletePhoto}
+                    disabled={deletingPhoto}
+                    className="w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ background: "#c15252" }}
+                    data-ocid="profile.photo.delete_button"
+                  >
+                    <Trash2 className="w-4 h-4 text-white" />
+                  </button>
+                )}
+              </div>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -251,18 +424,37 @@ export default function TelegramProfile({
             )}
           </div>
 
-          {/* Online badge */}
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-              style={{ background: "#3b9e5a" }}
-            />
-            <span
-              className="text-sm font-semibold"
-              style={{ color: "#3b9e5a" }}
-            >
-              Online
-            </span>
+          {/* Online + login method badge */}
+          <div className="flex items-center gap-2 flex-wrap justify-center">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ background: "#3b9e5a" }}
+              />
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "#3b9e5a" }}
+              >
+                Online
+              </span>
+            </div>
+            {isGoogleUser && (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                style={{
+                  background: "rgba(66,133,244,0.15)",
+                  border: "1px solid rgba(66,133,244,0.3)",
+                }}
+              >
+                <GoogleColorIcon size={12} />
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: "#7db3f5" }}
+                >
+                  Signed in with Google
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Name / Username / Bio */}
@@ -351,34 +543,51 @@ export default function TelegramProfile({
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-2">
-              <div
-                className="rounded-xl px-4 py-3"
-                style={{ background: "#182533", border: "1px solid #2b3d54" }}
-              >
-                <p className="text-xs" style={{ color: "#4a6278" }}>
-                  Balance
-                </p>
-                <p className="text-sm font-bold" style={{ color: "#f0c040" }}>
-                  💛 {coins.toLocaleString()} Coins
-                </p>
+            {/* Stats — only show for II users */}
+            {identity && (
+              <div className="grid grid-cols-2 gap-2">
+                <div
+                  className="rounded-xl px-4 py-3"
+                  style={{ background: "#182533", border: "1px solid #2b3d54" }}
+                >
+                  <p className="text-xs" style={{ color: "#4a6278" }}>
+                    Balance
+                  </p>
+                  <p className="text-sm font-bold" style={{ color: "#f0c040" }}>
+                    💛 {coins.toLocaleString()} Coins
+                  </p>
+                </div>
+                <div
+                  className="rounded-xl px-4 py-3"
+                  style={{ background: "#182533", border: "1px solid #2b3d54" }}
+                >
+                  <p className="text-xs" style={{ color: "#4a6278" }}>
+                    Harem
+                  </p>
+                  <p className="text-sm font-bold" style={{ color: "#e8f4fd" }}>
+                    💝 {harem.length} Waifus
+                  </p>
+                </div>
               </div>
-              <div
-                className="rounded-xl px-4 py-3"
-                style={{ background: "#182533", border: "1px solid #2b3d54" }}
-              >
-                <p className="text-xs" style={{ color: "#4a6278" }}>
-                  Harem
-                </p>
-                <p className="text-sm font-bold" style={{ color: "#e8f4fd" }}>
-                  💝 {harem.length} Waifus
-                </p>
-              </div>
-            </div>
+            )}
 
-            {/* Principal ID */}
-            {principalStr && (
+            {/* Google user email info */}
+            {isGoogleUser && googleAuth.user && (
+              <div
+                className="rounded-xl px-4 py-3"
+                style={{ background: "#182533", border: "1px solid #2b3d54" }}
+              >
+                <p className="text-xs" style={{ color: "#4a6278" }}>
+                  Email
+                </p>
+                <p className="text-sm font-mono" style={{ color: "#7db3f5" }}>
+                  {googleAuth.user.email}
+                </p>
+              </div>
+            )}
+
+            {/* Principal ID — only for II users */}
+            {principalStr && identity && (
               <div
                 className="rounded-xl px-4 py-3 flex items-center gap-3"
                 style={{ background: "#182533", border: "1px solid #2b3d54" }}
@@ -410,65 +619,66 @@ export default function TelegramProfile({
               </div>
             )}
 
-            {/* Friend Requests */}
-            {friendRequests.filter((r) => r.status === "pending").length >
-              0 && (
-              <div
-                className="rounded-xl overflow-hidden"
-                style={{ background: "#182533", border: "1px solid #2b3d54" }}
-              >
+            {/* Friend Requests — only for II users */}
+            {identity &&
+              friendRequests.filter((r) => r.status === "pending").length >
+                0 && (
                 <div
-                  className="px-4 py-3"
-                  style={{ borderBottom: "1px solid #2b3d54" }}
+                  className="rounded-xl overflow-hidden"
+                  style={{ background: "#182533", border: "1px solid #2b3d54" }}
                 >
-                  <p
-                    className="text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: "#4a6278" }}
+                  <div
+                    className="px-4 py-3"
+                    style={{ borderBottom: "1px solid #2b3d54" }}
                   >
-                    Friend Requests
-                  </p>
-                </div>
-                {friendRequests
-                  .filter((r) => r.status === "pending")
-                  .map((req, i) => (
-                    <div
-                      key={req.fromUser.toString()}
-                      className="flex items-center gap-3 px-4 py-3"
-                      style={{
-                        borderBottom:
-                          i < friendRequests.length - 1
-                            ? "1px solid #2b3d54"
-                            : "none",
-                      }}
+                    <p
+                      className="text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: "#4a6278" }}
                     >
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-xs font-mono truncate"
-                          style={{ color: "#e8f4fd" }}
-                        >
-                          {req.fromUser.toString().slice(0, 16)}...
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          acceptFriendRequest
-                            .mutateAsync(req.fromUser)
-                            .then(() =>
-                              toast.success("Friend request accepted!"),
-                            )
-                            .catch(() => toast.error("Failed to accept."))
-                        }
-                        className="px-3 py-1 rounded-lg text-xs font-bold text-white"
-                        style={{ background: "#3b9e5a" }}
-                        data-ocid={`profile.friend_request.button.${i + 1}`}
+                      Friend Requests
+                    </p>
+                  </div>
+                  {friendRequests
+                    .filter((r) => r.status === "pending")
+                    .map((req, i) => (
+                      <div
+                        key={req.fromUser.toString()}
+                        className="flex items-center gap-3 px-4 py-3"
+                        style={{
+                          borderBottom:
+                            i < friendRequests.length - 1
+                              ? "1px solid #2b3d54"
+                              : "none",
+                        }}
                       >
-                        Accept
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-xs font-mono truncate"
+                            style={{ color: "#e8f4fd" }}
+                          >
+                            {req.fromUser.toString().slice(0, 16)}...
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            acceptFriendRequest
+                              .mutateAsync(req.fromUser)
+                              .then(() =>
+                                toast.success("Friend request accepted!"),
+                              )
+                              .catch(() => toast.error("Failed to accept."))
+                          }
+                          className="px-3 py-1 rounded-lg text-xs font-bold text-white"
+                          style={{ background: "#3b9e5a" }}
+                          data-ocid={`profile.friend_request.button.${i + 1}`}
+                        >
+                          Accept
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
 
             {/* Admin Panel link */}
             {isAdmin && (
@@ -486,7 +696,7 @@ export default function TelegramProfile({
             {/* Logout */}
             <button
               type="button"
-              onClick={clear}
+              onClick={isGoogleUser ? googleAuth.logout : clear}
               className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:brightness-110"
               style={{
                 background: "rgba(193,82,82,0.15)",
@@ -515,6 +725,13 @@ export default function TelegramProfile({
           </a>
         </p>
       </div>
+
+      {/* Google Login Modal */}
+      <GoogleLoginModal
+        open={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSuccess={() => setShowGoogleModal(false)}
+      />
     </div>
   );
 }

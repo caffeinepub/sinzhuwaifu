@@ -280,6 +280,9 @@ export default function Admin() {
             <TabsTrigger value="ads" data-ocid="admin.ads.tab">
               📢 Ads
             </TabsTrigger>
+            <TabsTrigger value="coupons" data-ocid="admin.coupons.tab">
+              🀄 Coupons
+            </TabsTrigger>
           </TabsList>
 
           {/* WAIFU MANAGEMENT */}
@@ -698,8 +701,157 @@ export default function Admin() {
               </div>
             </div>
           </TabsContent>
+          <TabsContent value="coupons" className="mt-6 space-y-6">
+            <div className="card-glass rounded-2xl p-6">
+              <h3 className="font-bold text-lg mb-4">Create Coupon Code</h3>
+              <CouponAdminForm />
+            </div>
+            <div className="card-glass rounded-2xl p-6">
+              <h3 className="font-bold text-lg mb-4">Active Coupons</h3>
+              <CouponList />
+            </div>
+          </TabsContent>
         </Tabs>
       </motion.div>
     </main>
+  );
+}
+
+function CouponAdminForm() {
+  const [onexAmount, setOnexAmount] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+
+  const handleCreate = () => {
+    const amount = Number.parseInt(onexAmount, 10);
+    const code = couponCode.trim().toUpperCase();
+    if (!amount || amount <= 0) {
+      toast.error("❌ Enter a valid Onex amount");
+      return;
+    }
+    if (code.length !== 6) {
+      toast.error("❌ Coupon code must be exactly 6 characters");
+      return;
+    }
+    const couponsRaw = localStorage.getItem("sinzhu_coupons");
+    const coupons: { code: string; onex: number; usedBy: string[] }[] =
+      couponsRaw ? JSON.parse(couponsRaw) : [];
+    if (coupons.some((c) => c.code === code)) {
+      toast.error("❌ Coupon code already exists");
+      return;
+    }
+    coupons.push({ code, onex: amount, usedBy: [] });
+    localStorage.setItem("sinzhu_coupons", JSON.stringify(coupons));
+    toast.success("✅ Coupon created!");
+    setOnexAmount("");
+    setCouponCode("");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm font-medium text-foreground mb-1">
+          Onex Reward Amount
+        </p>
+        <Input
+          type="number"
+          value={onexAmount}
+          onChange={(e) => setOnexAmount(e.target.value)}
+          placeholder="e.g. 500"
+          min={1}
+          style={{ background: "oklch(0.10 0.025 290)" }}
+          data-ocid="admin.coupon_onex.input"
+        />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-foreground mb-1">
+          Coupon Code (6 digits)
+        </p>
+        <Input
+          value={couponCode}
+          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+          maxLength={6}
+          placeholder="e.g. ABC123"
+          style={{
+            background: "oklch(0.10 0.025 290)",
+            letterSpacing: "0.2em",
+          }}
+          data-ocid="admin.coupon_code.input"
+        />
+      </div>
+      <Button
+        className="btn-pink px-6"
+        onClick={handleCreate}
+        data-ocid="admin.create_coupon.submit_button"
+      >
+        ✅ OK / Create
+      </Button>
+    </div>
+  );
+}
+
+function CouponList() {
+  const [, forceUpdate] = useState(0);
+  const couponsRaw = localStorage.getItem("sinzhu_coupons");
+  const coupons: { code: string; onex: number; usedBy: string[] }[] = couponsRaw
+    ? JSON.parse(couponsRaw)
+    : [];
+
+  const handleDelete = (code: string) => {
+    const couponsRaw2 = localStorage.getItem("sinzhu_coupons");
+    const list: { code: string; onex: number; usedBy: string[] }[] = couponsRaw2
+      ? JSON.parse(couponsRaw2)
+      : [];
+    const updated = list.filter((c) => c.code !== code);
+    localStorage.setItem("sinzhu_coupons", JSON.stringify(updated));
+    toast.success("🗑️ Coupon deleted");
+    forceUpdate((n) => n + 1);
+  };
+
+  if (coupons.length === 0) {
+    return (
+      <p
+        className="text-sm text-muted-foreground"
+        data-ocid="admin.coupons.empty_state"
+      >
+        No coupons created yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {coupons.map((coupon, i) => (
+        <div
+          key={coupon.code}
+          className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/30"
+          style={{
+            background: "oklch(0.12 0.03 290)",
+            border: "1px solid oklch(0.20 0.04 290)",
+          }}
+          data-ocid={`admin.coupon.item.${i + 1}`}
+        >
+          <div>
+            <p
+              className="font-bold tracking-widest text-sm"
+              style={{ letterSpacing: "0.2em" }}
+            >
+              {coupon.code}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {coupon.onex} Onex • Used by {coupon.usedBy.length} user(s)
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+            onClick={() => handleDelete(coupon.code)}
+            data-ocid={`admin.coupon.delete_button.${i + 1}`}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      ))}
+    </div>
   );
 }

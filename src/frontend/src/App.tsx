@@ -3,10 +3,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import ChatSidebar from "./components/ChatSidebar";
 import ChatWindow from "./components/ChatWindow";
+import GoogleLoginModal from "./components/GoogleLoginModal";
 import TelegramProfile from "./components/TelegramProfile";
+import { useGoogleAuth } from "./hooks/useGoogleAuth";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import Admin from "./pages/Admin";
 import CheckPage from "./pages/CheckPage";
+import CouponPage from "./pages/CouponPage";
 import Daily from "./pages/Daily";
 import GiftPage from "./pages/GiftPage";
 import Harem from "./pages/Harem";
@@ -14,6 +17,7 @@ import HclaimPage from "./pages/HclaimPage";
 import Leaderboard from "./pages/Leaderboard";
 import PayPage from "./pages/PayPage";
 import RankPage from "./pages/RankPage";
+import ReferPage from "./pages/ReferPage";
 import Shop from "./pages/Shop";
 import TopGroupsPage from "./pages/TopGroupsPage";
 import TopPage from "./pages/TopPage";
@@ -38,7 +42,9 @@ export type GamePage =
   | "tops"
   | "welkin"
   | "treasure"
-  | "hclaim";
+  | "hclaim"
+  | "coupon"
+  | "refer";
 
 export type ChatView =
   | { type: "welcome" }
@@ -68,7 +74,39 @@ function LoadingScreen() {
   );
 }
 
+function GoogleColorIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Google"
+    >
+      <path
+        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+        fill="#4285F4"
+      />
+      <path
+        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+        fill="#34A853"
+      />
+      <path
+        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+
   return (
     <div
       className="flex h-screen w-screen items-center justify-center"
@@ -116,28 +154,64 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           </p>
         </div>
 
-        {/* Login button */}
+        {/* Google Login button */}
+        <button
+          type="button"
+          onClick={() => setShowGoogleModal(true)}
+          data-ocid="login.google.button"
+          className="w-full flex items-center justify-center gap-3 rounded-xl py-3 font-semibold text-sm transition-all hover:shadow-lg active:scale-95"
+          style={{
+            background: "#ffffff",
+            color: "#3c4043",
+            maxWidth: 320,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+          }}
+        >
+          <GoogleColorIcon />
+          Continue with Google
+        </button>
+
+        {/* Divider */}
+        <div
+          className="flex items-center gap-3 w-full"
+          style={{ maxWidth: 320 }}
+        >
+          <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
+          <span className="text-xs" style={{ color: "#4a6278" }}>
+            or
+          </span>
+          <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
+        </div>
+
+        {/* Internet Identity button */}
         <button
           type="button"
           onClick={onLogin}
           data-ocid="login.primary_button"
-          className="w-full rounded-xl py-3 text-white font-semibold text-base transition-opacity hover:opacity-90 active:opacity-75"
+          className="w-full rounded-xl py-2.5 text-white font-semibold text-sm transition-opacity hover:opacity-90 active:opacity-75"
           style={{ background: "#2481cc", maxWidth: 320 }}
         >
-          🔑 Login with Google
+          🔑 Login with Internet Identity
         </button>
 
         {/* Powered by note */}
         <p className="text-xs" style={{ color: "#4a6378" }}>
-          Powered by Internet Identity
+          Secured by Internet Identity · Google
         </p>
       </motion.div>
+
+      <GoogleLoginModal
+        open={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSuccess={() => setShowGoogleModal(false)}
+      />
     </div>
   );
 }
 
 export default function App() {
   const { identity, isInitializing, login } = useInternetIdentity();
+  const googleAuth = useGoogleAuth();
   const [activeView, setActiveView] = useState<ChatView>({ type: "welcome" });
   const [showSidebar, setShowSidebar] = useState(true);
 
@@ -147,7 +221,9 @@ export default function App() {
   }
 
   const isAnon = !identity || identity.getPrincipal().isAnonymous();
-  if (isAnon) {
+  const isLoggedIn = !isAnon || !!googleAuth.user;
+
+  if (!isLoggedIn) {
     return <LoginScreen onLogin={login} />;
   }
 
@@ -279,6 +355,18 @@ export default function App() {
           return (
             <div className={wrapperClass}>
               <HclaimPage onNavigate={nav} />
+            </div>
+          );
+        case "coupon":
+          return (
+            <div className={wrapperClass}>
+              <CouponPage onNavigate={nav} />
+            </div>
+          );
+        case "refer":
+          return (
+            <div className={wrapperClass}>
+              <ReferPage onNavigate={nav} />
             </div>
           );
       }

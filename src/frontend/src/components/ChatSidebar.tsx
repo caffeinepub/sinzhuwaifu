@@ -43,6 +43,8 @@ interface LocalFriend {
 }
 
 const GAME_ITEMS: { page: GamePage; icon: string; label: string }[] = [
+  { page: "coupon", icon: "🀄", label: "Coupon" },
+  { page: "refer", icon: "💖", label: "Refer" },
   { page: "shop", icon: "🛍️", label: "Shop" },
   { page: "daily", icon: "💎", label: "Daily" },
   { page: "hclaim", icon: "🎀", label: "hclaim" },

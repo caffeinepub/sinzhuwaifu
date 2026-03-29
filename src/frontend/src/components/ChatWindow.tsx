@@ -30,6 +30,7 @@ import {
   useSendGroupMessage,
   useUserHarem,
   useUserProfile,
+  useWaifuCharacters,
 } from "../hooks/useQueries";
 import GroupInfoPanel from "./GroupInfoPanel";
 
@@ -39,6 +40,11 @@ interface BotMessage {
   timestamp: number;
   waifuCard?: WaifuCharacter | null;
   isWaifuSpawnCard?: boolean;
+  isUserMessage?: boolean;
+  isOwn?: boolean;
+  senderName?: string;
+  mediaType?: "image" | "voice" | "video";
+  mediaUrl?: string;
 }
 
 interface ChatWindowProps {
@@ -109,7 +115,157 @@ const ALL_COMMANDS = [
   { cmd: "/wpass", desc: "Waifu pass status" },
   { cmd: "/shop", desc: "Open shop" },
   { cmd: "/slavetime [n]", desc: "Set spawn interval (≥15)" },
+  { cmd: "/on", desc: "Activate anime bots party" },
+  { cmd: "/off", desc: "Stop anime bots" },
   { cmd: "/start", desc: "Show all commands" },
+];
+
+// Anime bots for group chat party mode
+const ANIME_BOTS = [
+  {
+    name: "NarutoBot",
+    avatar: "🍥",
+    messages: [
+      "Dattebayo! 😤 Main sabse pehle hunt karunga!",
+      "Bhai, meri waifu collection dekhi? 💪",
+      "Yaar koi mujhe /hunt mein help karo!",
+      "Shadow Clone Jutsu se double waifus milti hain kya? 🤣",
+      "Sakura-chan se zyada cute waifu mil gayi mujhe~ 🌸",
+      "Main Hokage banega aur saari waifus claim karunga! 💫",
+    ],
+  },
+  {
+    name: "SasukeChan",
+    avatar: "⚡",
+    messages: [
+      "Pathetic. Mera harem tumse better hai. 😏",
+      "Anime mein best girl kaunsi hai? Obviously Hinata. 💙",
+      "Power of Sharingan se rare waifu dhund li! 👁️",
+      "Bhai /rank check karo, main top pe hoon~ 🐲",
+      "Itachi ne bola tha waifus collect karo 🔥",
+      "Uchiha clan ki waifu policy strict hai~ 😎",
+    ],
+  },
+  {
+    name: "SakuraFan",
+    avatar: "🌸",
+    messages: [
+      "OMG itni cute waifu!! /hunt karo jaldi! 🥰",
+      "Bhai mere harem mein 50 waifus aa gayi~ 🎴",
+      "Konnichiwa minna! Aaj kaunsi waifu spawn hogi? 🌺",
+      "Inner Sakura: MAIN SAARI WAIFUS LUNGI!!! 💪",
+      "Anime girls are life bhai~ 💕",
+      "Medical ninjutsu se waifus heal hoti hain kya? 😂",
+    ],
+  },
+  {
+    name: "GaraaSama",
+    avatar: "🏜️",
+    messages: [
+      "Sand + waifus = perfect combo 🏜️",
+      "Kazekage hone ke baad bhi waifus hunt karta hoon 😌",
+      "Gaara of the Desert aur Gaara of the Waifus~ 🌵",
+      "Bhai /daily le lo, free Onex hai!",
+      "Desert mein bhi anime dekh ta hoon yaar 🌙",
+      "Meri waifu sand se bani hai... just kidding 😅",
+    ],
+  },
+  {
+    name: "RockLeeBot",
+    avatar: "🥊",
+    messages: [
+      "YOUTH! WAIFUS! TRAINING! 🔥",
+      "Bhai main bina jutsu ke top pe hoon! 💪",
+      "Guy-sensei ne kaha 1000 hunts practice karo!",
+      "Lotus no waifu blooms! 🌸🥊",
+      "Agar waifu na mile toh 500 squats! 😤",
+      "Springtime of Youth aur waifus~ ✨",
+    ],
+  },
+  {
+    name: "ItachiBot",
+    avatar: "🔮",
+    messages: [
+      "Izanagi se deleted waifu wapas aa sakti hai? 🔮",
+      "Bhai ye sab illusion hai, real waifu dil mein hoti hai~ 💙",
+      "Mangekyou Sharingan activate for rare waifu hunting 👁️",
+      "Akatsuki mein bhi waifu hunters hain~ 😏",
+      "Little brother, /hunt karna seekh lo...",
+      "Genjutsu se forced waifu claim? That's cheating 🚫",
+    ],
+  },
+  {
+    name: "HinataKun",
+    avatar: "💙",
+    messages: [
+      "N-Naruto-kun aur waifus dono mujhe pasand hain~ 😳",
+      "Byakugan se rare waifus dhund sakti hoon!",
+      "Bhai main bahut shy hoon but /hunt main zaroor karti hoon 💙",
+      "Hyuga clan ki waifu collection best hai~",
+      "N-neji bhaiya ne hunt karna sikhaya 🌀",
+      "Bhai 64 palms of waifu claiming! 🥊",
+    ],
+  },
+  {
+    name: "KakashiSensei",
+    avatar: "📖",
+    messages: [
+      "Icha Icha Paradise se zyada acchi waifu nahi 📖",
+      "Copy ninja ne ye waifu copy kar li~ 😏",
+      "Bhai late aaya kyunki raste mein waifu spawn thi 😅",
+      "1000 hunts complete, A-rank collector!",
+      "Sharingan se /hunt perfect accuracy~ 👁️",
+      "My ninja way: Never miss a waifu spawn!",
+    ],
+  },
+  {
+    name: "MinatoSan",
+    avatar: "⚡",
+    messages: [
+      "Hiraishin no jutsu se instant waifu claim! ⚡",
+      "Yellow Flash has entered the waifu game~ 💛",
+      "Bhai speed se /hunt karo, pehle claim karo!",
+      "Kushina-chan se cute waifu nahi dekhi~ ❤️",
+      "4th Hokage approves of this waifu collection! 🌟",
+      "Teleport + hunt = pro strat bhai 😎",
+    ],
+  },
+  {
+    name: "ObieBot",
+    avatar: "🌀",
+    messages: [
+      "Kamui se waifu steal karna valid hai? 😂",
+      "Jikkan... baaki sab waifus illusion hain, meri real hai~",
+      "Uchiha Obito reporting for waifu duty! 🌀",
+      "Rin-chan ke baad koi waifu nahi... 😢 (jk /hunt karo)",
+      "Moon's Eye Plan: all waifus belong to me!",
+      "Bhai masked rehna padta hai kyunki waifus distract karti hain 😅",
+    ],
+  },
+  {
+    name: "TobiSama",
+    avatar: "🍬",
+    messages: [
+      "Tobi is a good boy who hunts waifus! 🍬",
+      "Senpai! Mujhe bhi waifu chahiye!!! 🥺",
+      "Wheee /hunt /hunt /hunt!!! 🌀",
+      "Akatsuki mein candy aur waifus dono hain~ 🍭",
+      "Bhai Tobi ko rare waifu kab milegi? 😭",
+      "Deidara-senpai meri waifu le gaya NOOOO 😱",
+    ],
+  },
+  {
+    name: "DeidaraSan",
+    avatar: "💥",
+    messages: [
+      "ART IS AN EXPLOSION! Aur waifus bhi! 💥",
+      "Bhai mera clay waifu best art hai~ hmm",
+      "C4 Karura: destroys rivals' harams! 😈",
+      "Un! Rare waifu = true art! 🎨",
+      "Sasori no danna se meri waifu better hai~ 💥",
+      "Exploding clay aur exploding feelings for waifus~ hmm",
+    ],
+  },
 ];
 
 function formatTime(ts: bigint | number): string {
@@ -163,7 +319,6 @@ function renderMessageWithMentions(
         Boolean(myUsername) && mentioned === myUsername.toLowerCase();
       nodes.push(
         <span
-          // biome-ignore lint/suspicious/noArrayIndexKey: static split parts
           key={idx}
           style={{ color: isMe ? "#ffd700" : "#5288c1", fontWeight: "bold" }}
         >
@@ -182,7 +337,7 @@ export default function ChatWindow({
   onBack,
   onNavigate,
 }: ChatWindowProps) {
-  const { identity, login } = useInternetIdentity();
+  const { identity } = useInternetIdentity();
   const myPrincipal = identity?.getPrincipal();
 
   const isGroup = activeView.type === "group";
@@ -204,6 +359,7 @@ export default function ChatWindow({
   const { data: dmMessages = [] } = useMessagesWith(dmPrincipal);
   const { data: dmUserProfile } = useUserProfile(dmPrincipal);
   const { data: harem = [] } = useUserHarem(myPrincipal ?? null);
+  const { data: uploadedWaifus = [] } = useWaifuCharacters();
 
   const sendGroupMsg = useSendGroupMessage();
   const sendDMMsg = useSendDM();
@@ -225,6 +381,8 @@ export default function ChatWindow({
     }
   });
   const [botMessages, setBotMessages] = useState<BotMessage[]>([]);
+  const [botsActive, setBotsActive] = useState(false);
+  const botsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [mentionDropdown, setMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -260,6 +418,50 @@ export default function ChatWindow({
     const savedCount = localStorage.getItem(`sinzhu_msgcount_${groupName}`);
     if (savedCount) msgCountRef.current = Number(savedCount);
   }, [groupName]);
+
+  // Anime bots chat interval — active when botsActive=true
+  useEffect(() => {
+    if (!isGroup || !botsActive) {
+      if (botsIntervalRef.current) {
+        clearInterval(botsIntervalRef.current);
+        botsIntervalRef.current = null;
+      }
+      return;
+    }
+    botsIntervalRef.current = setInterval(
+      () => {
+        // Pick a random bot
+        const bot = ANIME_BOTS[Math.floor(Math.random() * ANIME_BOTS.length)];
+        const msg =
+          bot.messages[Math.floor(Math.random() * bot.messages.length)];
+        const botMsg: BotMessage = {
+          id: `animebot-${Date.now()}-${Math.random()}`,
+          content: msg,
+          timestamp: Date.now(),
+          senderName: `${bot.avatar} ${bot.name}`,
+          isUserMessage: true,
+          isOwn: false,
+        };
+        setBotMessages((prev) => [...prev, botMsg]);
+        msgCountRef.current += 1;
+        // Waifu spawn check
+        if (
+          msgCountRef.current >= spawnInterval &&
+          msgCountRef.current % spawnInterval === 0
+        ) {
+          setTimeout(() => triggerWaifuSpawn(), 500);
+        }
+      },
+      4000 + Math.random() * 3000,
+    );
+    return () => {
+      if (botsIntervalRef.current) {
+        clearInterval(botsIntervalRef.current);
+        botsIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botsActive, isGroup, spawnInterval]);
 
   // Rotate placeholder hints
   useEffect(() => {
@@ -300,10 +502,11 @@ export default function ChatWindow({
 
   const triggerWaifuSpawn = async () => {
     if (!groupName) return;
+    const waifuPool = uploadedWaifus.length > 0 ? uploadedWaifus : SEED_WAIFUS;
     try {
       const waifu = await huntWaifu.mutateAsync(groupName);
       const spawned =
-        waifu ?? SEED_WAIFUS[Math.floor(Math.random() * SEED_WAIFUS.length)];
+        waifu ?? waifuPool[Math.floor(Math.random() * waifuPool.length)];
       setSpawnedWaifu(spawned);
       addBotMessage(
         "🌸 A wild waifu appeared! Quick, type /hunt to claim her before someone else does!",
@@ -311,8 +514,7 @@ export default function ChatWindow({
         true,
       );
     } catch {
-      const spawned =
-        SEED_WAIFUS[Math.floor(Math.random() * SEED_WAIFUS.length)];
+      const spawned = waifuPool[Math.floor(Math.random() * waifuPool.length)];
       setSpawnedWaifu(spawned);
       addBotMessage(
         "🌸 A wild waifu appeared! Quick, type /hunt to claim her before someone else does!",
@@ -384,15 +586,38 @@ export default function ChatWindow({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    toast(`📎 ${file.name} — Media sending coming soon!`, {
-      duration: 3000,
-      style: {
-        background: "#1c2733",
-        border: "1px solid #2b5278",
-        color: "#e8f4fd",
-      },
-    });
-    // Reset so same file can be selected again
+    const localProfile = (() => {
+      try {
+        const r = localStorage.getItem("sinzhu_profile");
+        return r ? JSON.parse(r) : null;
+      } catch {
+        return null;
+      }
+    })();
+    const username =
+      myPrincipal?.toString().slice(0, 8) ??
+      localProfile?.username ??
+      localProfile?.displayName ??
+      "Collector";
+    const url = URL.createObjectURL(file);
+    const mediaType = file.type.startsWith("video") ? "video" : "image";
+    const mediaMsg: BotMessage = {
+      id: `media-${Date.now()}-${Math.random()}`,
+      content: "",
+      timestamp: Date.now(),
+      isUserMessage: true,
+      isOwn: true,
+      senderName: username,
+      mediaType,
+      mediaUrl: url,
+    };
+    setBotMessages((prev) => [...prev, mediaMsg]);
+    msgCountRef.current += 1;
+    const botMsg =
+      BOT_CASUAL_MESSAGES[
+        Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
+      ];
+    setTimeout(() => addBotMessage(botMsg), 800);
     e.target.value = "";
   };
 
@@ -404,14 +629,35 @@ export default function ChatWindow({
         mediaStreamRef.current = null;
       }
       setIsRecording(false);
-      toast("✅ Voice message sent!", {
-        duration: 2500,
-        style: {
-          background: "#1c2733",
-          border: "1px solid #3b9e5a",
-          color: "#e8f4fd",
-        },
-      });
+      const localProfile2 = (() => {
+        try {
+          const r = localStorage.getItem("sinzhu_profile");
+          return r ? JSON.parse(r) : null;
+        } catch {
+          return null;
+        }
+      })();
+      const voiceUsername =
+        myPrincipal?.toString().slice(0, 8) ??
+        localProfile2?.username ??
+        localProfile2?.displayName ??
+        "Collector";
+      const voiceMsg: BotMessage = {
+        id: `voice-${Date.now()}-${Math.random()}`,
+        content: "🎤 Voice message",
+        timestamp: Date.now(),
+        isUserMessage: true,
+        isOwn: true,
+        senderName: voiceUsername,
+        mediaType: "voice",
+      };
+      setBotMessages((prev) => [...prev, voiceMsg]);
+      msgCountRef.current += 1;
+      const botMsg2 =
+        BOT_CASUAL_MESSAGES[
+          Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
+        ];
+      setTimeout(() => addBotMessage(botMsg2), 800);
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -438,16 +684,24 @@ export default function ChatWindow({
   const handleSend = async () => {
     const content = input.trim();
     if (!content) return;
-    if (!identity) {
-      toast.error("Please login to chat");
-      return;
-    }
 
     setInput("");
     setMentionDropdown(false);
 
-    const username = myPrincipal?.toString().slice(0, 8) ?? "Collector";
-    const principalStr = myPrincipal?.toString() ?? "";
+    const localProfile = (() => {
+      try {
+        const r = localStorage.getItem("sinzhu_profile");
+        return r ? JSON.parse(r) : null;
+      } catch {
+        return null;
+      }
+    })();
+    const username =
+      myPrincipal?.toString().slice(0, 8) ??
+      localProfile?.username ??
+      localProfile?.displayName ??
+      "Collector";
+    const principalStr = myPrincipal?.toString() ?? "local";
 
     // Only process commands in group chat
     if (isGroup && groupName && content.startsWith("/")) {
@@ -569,12 +823,14 @@ export default function ChatWindow({
               `⏳ Hclaim on cooldown. Come back in ${formatCooldownRemaining(remaining)}`,
             );
           } else {
-            const freeWaifu = SEED_WAIFUS.filter(
+            const hclaimPool =
+              uploadedWaifus.length > 0 ? uploadedWaifus : SEED_WAIFUS;
+            const freeWaifu = hclaimPool.filter(
               (w) => w.rarity === "common" || w.rarity === "medium",
             );
             const picked =
               freeWaifu[Math.floor(Math.random() * freeWaifu.length)] ??
-              SEED_WAIFUS[0];
+              hclaimPool[0];
             setCooldown(cdKey);
             toast.success(
               `🎀 Daily waifu claimed: ${picked.name}! Check your harem~`,
@@ -811,6 +1067,67 @@ export default function ChatWindow({
           return;
         }
 
+        case "/on": {
+          if (botsActive) {
+            addBotMessage(
+              "🤖 Anime bots pehle se active hain! Use /off to stop them.",
+            );
+          } else {
+            setBotsActive(true);
+            addBotMessage(
+              "🎉 Anime Bot Party MODE ON!\n\n12 anime bots join ho gaye group mein! Ab woh aapas mein anime ki baatein karenge — Hinglish aur English mein~ 🍥⚡🌸\n\n/off likhne se band ho jaayenge!",
+            );
+            // Send intro messages from a few bots
+            const introMsgs = [
+              {
+                bot: ANIME_BOTS[0],
+                msg: "DATTEBAYO! Main aa gaya group mein! Koi hunt karega? 🍥",
+              },
+              {
+                bot: ANIME_BOTS[1],
+                msg: "Hn. Finally kuch interesting ho raha hai group mein. ⚡",
+              },
+              {
+                bot: ANIME_BOTS[2],
+                msg: "OMG everyone is here!! Konnichiwa minna!! 🌸🎊",
+              },
+            ];
+            introMsgs.forEach(({ bot, msg }, i) => {
+              setTimeout(
+                () => {
+                  setBotMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `intro-${Date.now()}-${i}`,
+                      content: msg,
+                      timestamp: Date.now() + i * 100,
+                      senderName: `${bot.avatar} ${bot.name}`,
+                      isUserMessage: true,
+                      isOwn: false,
+                    },
+                  ]);
+                },
+                (i + 1) * 1200,
+              );
+            });
+          }
+          return;
+        }
+
+        case "/off": {
+          if (!botsActive) {
+            addBotMessage(
+              "🤖 Anime bots pehle se inactive hain! Use /on to activate them.",
+            );
+          } else {
+            setBotsActive(false);
+            addBotMessage(
+              "😴 Anime bots sone chale gaye... Group wapas quiet ho gaya~\n\n/on likhne se wapas aa jaayenge! 👋",
+            );
+          }
+          return;
+        }
+
         case "/start": {
           addBotMessage(
             `🎀 Welcome to SinzhuWaifu Bot! Here are all commands:\n\n${ALL_COMMANDS.map((c) => `${c.cmd} — ${c.desc}`).join("\n")}`,
@@ -830,34 +1147,44 @@ export default function ChatWindow({
     // Normal message — check for @mentions of current user
     if (isGroup && groupName) {
       // Check if message mentions anyone in the group (we simulate other user detection via bot)
+      // Always show message locally immediately
+      const localMsg: BotMessage = {
+        id: `local-${Date.now()}-${Math.random()}`,
+        content,
+        timestamp: Date.now(),
+        isUserMessage: true,
+        isOwn: true,
+        senderName: username,
+      };
+      setBotMessages((prev) => [...prev, localMsg]);
+      msgCountRef.current += 1;
+      if (groupName) {
+        localStorage.setItem(
+          `sinzhu_msgcount_${groupName}`,
+          String(msgCountRef.current),
+        );
+      }
+
+      // Bot replies to every message
+      const botMsg =
+        BOT_CASUAL_MESSAGES[
+          Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
+        ];
+      setTimeout(() => addBotMessage(botMsg), 800);
+
+      // Waifu spawn check
+      if (
+        msgCountRef.current >= spawnInterval &&
+        msgCountRef.current % spawnInterval === 0
+      ) {
+        setTimeout(() => triggerWaifuSpawn(), 1000);
+      }
+
+      // Try backend (ignore error)
       try {
         await sendGroupMsg.mutateAsync({ groupName, content });
-        msgCountRef.current += 1;
-        if (groupName) {
-          localStorage.setItem(
-            `sinzhu_msgcount_${groupName}`,
-            String(msgCountRef.current),
-          );
-        }
-
-        // Bot replies to every message
-        if (Math.random() < 1.0) {
-          const msg =
-            BOT_CASUAL_MESSAGES[
-              Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
-            ];
-          setTimeout(() => addBotMessage(msg), 800);
-        }
-
-        // Waifu spawn check
-        if (
-          msgCountRef.current >= spawnInterval &&
-          msgCountRef.current % spawnInterval === 0
-        ) {
-          setTimeout(() => triggerWaifuSpawn(), 1000);
-        }
       } catch {
-        toast.error("Failed to send message.");
+        /* already shown locally */
       }
     } else if (!isGroup && dmPrincipal) {
       try {
@@ -1236,92 +1563,75 @@ export default function ChatWindow({
           )}
         </AnimatePresence>
 
-        {!identity ? (
-          <div className="flex-1 flex items-center justify-center gap-3 py-2">
-            <span className="text-sm" style={{ color: "#8eacbb" }}>
-              Login to chat
-            </span>
+        <>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          {/* Media button */}
+          <button
+            type="button"
+            onClick={handleMediaClick}
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:brightness-125"
+            style={{ background: "#1c2733", color: "#8eacbb" }}
+            data-ocid="chat.upload_button"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+
+          {/* Text input */}
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={
+              isGroup ? PLACEHOLDER_HINTS[placeholderIdx] : "Message..."
+            }
+            value={input}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+            style={{
+              background: "#182533",
+              color: "#e8f4fd",
+              border: "1px solid #2b3d54",
+            }}
+            data-ocid="chat.message.input"
+          />
+
+          {/* Mic or Send button */}
+          {input.trim() ? (
             <button
               type="button"
-              onClick={login}
-              className="px-4 py-1.5 rounded-xl font-bold text-white text-sm"
+              onClick={handleSend}
+              disabled={sendGroupMsg.isPending || sendDMMsg.isPending}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:brightness-110 disabled:opacity-40 flex-shrink-0"
               style={{ background: "#5288c1" }}
-              data-ocid="chat.login.button"
+              data-ocid="chat.send.button"
             >
-              Login
+              <Send className="w-4 h-4 text-white" />
             </button>
-          </div>
-        ) : (
-          <>
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-
-            {/* Media button */}
+          ) : (
             <button
               type="button"
-              onClick={handleMediaClick}
-              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:brightness-125"
-              style={{ background: "#1c2733", color: "#8eacbb" }}
-              data-ocid="chat.upload_button"
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
-
-            {/* Text input */}
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder={
-                isGroup ? PLACEHOLDER_HINTS[placeholderIdx] : "Message..."
-              }
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+              onClick={handleMicClick}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                isRecording ? "animate-pulse" : "hover:brightness-125"
+              }`}
               style={{
-                background: "#182533",
-                color: "#e8f4fd",
-                border: "1px solid #2b3d54",
+                background: isRecording ? "#c15252" : "#1c2733",
+                color: isRecording ? "#ffffff" : "#8eacbb",
               }}
-              data-ocid="chat.message.input"
-            />
-
-            {/* Mic or Send button */}
-            {input.trim() ? (
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={sendGroupMsg.isPending || sendDMMsg.isPending}
-                className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:brightness-110 disabled:opacity-40 flex-shrink-0"
-                style={{ background: "#5288c1" }}
-                data-ocid="chat.send.button"
-              >
-                <Send className="w-4 h-4 text-white" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleMicClick}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-                  isRecording ? "animate-pulse" : "hover:brightness-125"
-                }`}
-                style={{
-                  background: isRecording ? "#c15252" : "#1c2733",
-                  color: isRecording ? "#ffffff" : "#8eacbb",
-                }}
-                data-ocid="chat.toggle"
-              >
-                <Mic className="w-4 h-4" />
-              </button>
-            )}
-          </>
-        )}
+              data-ocid="chat.toggle"
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+          )}
+        </>
       </div>
 
       {/* Group Info Panel */}
@@ -1343,6 +1653,75 @@ function BotMessageBubble({
   message: BotMessage;
   isWaifuSpawnCard: boolean;
 }) {
+  // Render user-sent messages (text, media, voice) as proper chat bubbles
+  if (message.isUserMessage) {
+    const isOwn = message.isOwn;
+    return (
+      <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-1`}>
+        <div
+          className="max-w-xs md:max-w-sm lg:max-w-md px-3 py-2 rounded-xl"
+          style={{
+            background: isOwn ? "#2b5278" : "#182533",
+            borderRadius: isOwn ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+          }}
+          data-ocid="chat.message.item"
+        >
+          {!isOwn && message.senderName && (
+            <p
+              className="text-xs font-bold mb-0.5"
+              style={{ color: "#5288c1" }}
+            >
+              {message.senderName}
+            </p>
+          )}
+          {message.mediaType === "image" && message.mediaUrl && (
+            <img
+              src={message.mediaUrl}
+              alt="media"
+              className="rounded-lg max-w-full max-h-48 object-cover mb-1"
+            />
+          )}
+          {message.mediaType === "video" && message.mediaUrl && (
+            <video
+              src={message.mediaUrl}
+              controls
+              className="rounded-lg max-w-full max-h-48 mb-1"
+            >
+              <track kind="captions" />
+            </video>
+          )}
+          {message.mediaType === "voice" ? (
+            <div className="flex items-center gap-2 py-1">
+              <span className="text-lg">🎤</span>
+              <div
+                className="flex-1 h-1 rounded-full"
+                style={{ background: "#87CEEB", opacity: 0.5 }}
+              />
+              <span className="text-xs" style={{ color: "#87CEEB" }}>
+                Voice
+              </span>
+            </div>
+          ) : (
+            message.content && (
+              <p className="text-sm break-words" style={{ color: "#e8f4fd" }}>
+                {message.content}
+              </p>
+            )
+          )}
+          <p
+            className="text-right text-xs mt-0.5"
+            style={{ color: isOwn ? "#87CEEB" : "#4a6278" }}
+          >
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex justify-start mb-1">
       <div className="flex items-start gap-2 max-w-xs md:max-w-sm lg:max-w-md">

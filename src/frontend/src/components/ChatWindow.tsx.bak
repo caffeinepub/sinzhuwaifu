@@ -1,5 +1,13 @@
 import { Principal } from "@icp-sdk/core/principal";
-import { ArrowLeft, ChevronDown, Info, Send, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Info,
+  Mic,
+  Paperclip,
+  Send,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -41,6 +49,12 @@ interface ChatWindowProps {
   onNavigate?: (page: string) => void;
 }
 
+interface LocalFriend {
+  username: string;
+  principalId: string;
+  displayName: string;
+}
+
 const BOT_CASUAL_MESSAGES = [
   "Nice chat! 🌸 Keep collecting waifus!",
   "A waifu is watching you... 👀",
@@ -48,8 +62,24 @@ const BOT_CASUAL_MESSAGES = [
   "Your harem is waiting for you~ 💝",
   "🌟 Keep going, collector!",
   "The more you chat, the more waifus appear! ✨",
-  "🎀 SinzhuWaifu Bot is here to help!",
+  "🍀 sɪɴᴢʜᴜ ᴡᴀɪғᴜ ʙᴏᴛ 🍭 is always here for you!",
   "Did you claim your /daily reward today? 💎",
+  "Aww, you're so active~ 🥰 Keep chatting!",
+  "Hehe~ I see you~ 👁️ Don't forget to /hunt!",
+  "You seem fun! 😄 Want a waifu? Keep chatting~",
+  "Every message brings you closer to a waifu spawn! 🌸",
+  "Type /harem to see your beautiful collection~ 🎴",
+  "Konnichiwa! 🍡 I'm always watching the chat~",
+  "Ara ara~ you're chatting a lot today! 💕",
+  "Don't forget /hclaim for your free daily waifu! 🎀",
+  "Your waifus miss you~ go visit /harem 💖",
+  "So lively in here! I love it~ 🎊",
+  "Psst... a rare waifu might appear soon! 🔮",
+  "Uwu~ this group is amazing! 🌺",
+  "Keep the energy up! More chats = more waifus! ⚡",
+  "Type /rank to see how powerful you are! 🐲",
+  "Teehee~ 🍭 I'm your forever companion!",
+  "You're doing great, collector! 🏆 Never stop hunting!",
 ];
 
 const PLACEHOLDER_HINTS = [
@@ -77,7 +107,6 @@ const ALL_COMMANDS = [
   { cmd: "/gift [id]", desc: "Gift a waifu" },
   { cmd: "/pay [amount]", desc: "Pay Onex to friend" },
   { cmd: "/wpass", desc: "Waifu pass status" },
-  { cmd: "/harem", desc: "View harem" },
   { cmd: "/shop", desc: "Open shop" },
   { cmd: "/slavetime [n]", desc: "Set spawn interval (≥15)" },
   { cmd: "/start", desc: "Show all commands" },
@@ -108,6 +137,44 @@ function formatCooldownRemaining(ms: number): string {
   const h = Math.floor(ms / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);
   return `${h}h ${m}m`;
+}
+
+function loadFriends(): LocalFriend[] {
+  try {
+    const raw = localStorage.getItem("sinzhu_friends");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderMessageWithMentions(
+  content: string,
+  myUsername: string,
+): React.ReactNode {
+  if (!content.includes("@")) return content;
+  const parts = content.split(/(\@[\w\u0600-\u06FF]+)/g);
+  const nodes: React.ReactNode[] = [];
+  for (let idx = 0; idx < parts.length; idx++) {
+    const part = parts[idx];
+    if (part.startsWith("@")) {
+      const mentioned = part.slice(1).toLowerCase();
+      const isMe =
+        Boolean(myUsername) && mentioned === myUsername.toLowerCase();
+      nodes.push(
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: static split parts
+          key={idx}
+          style={{ color: isMe ? "#ffd700" : "#5288c1", fontWeight: "bold" }}
+        >
+          {part}
+        </span>,
+      );
+    } else {
+      nodes.push(part);
+    }
+  }
+  return nodes;
 }
 
 export default function ChatWindow({
@@ -147,8 +214,36 @@ export default function ChatWindow({
   const [showInfo, setShowInfo] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
   const [spawnedWaifu, setSpawnedWaifu] = useState<WaifuCharacter | null>(null);
+  const [localHaremIds, setLocalHaremIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(
+        `sinzhu_local_harem_${isGroup ? activeView.groupName : "dm"}`,
+      );
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [botMessages, setBotMessages] = useState<BotMessage[]>([]);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [mentionDropdown, setMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [friends] = useState<LocalFriend[]>(loadFriends);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Derive my username from localStorage profile
+  const myUsername = (() => {
+    try {
+      const raw = localStorage.getItem("sinzhu_profile");
+      if (raw) {
+        const p = JSON.parse(raw);
+        return p.username || p.displayName || "";
+      }
+    } catch {}
+    return "";
+  })();
 
   // Per-group spawn interval & message count
   const [spawnInterval, setSpawnInterval] = useState(15);
@@ -227,6 +322,119 @@ export default function ChatWindow({
     }
   };
 
+  // Build mention candidates: friends + group members
+  const mentionCandidates: string[] = [
+    ...friends.map((f) => f.username),
+    ...(group?.members ?? []).map((m) => m.toString().slice(0, 8)),
+  ].filter((v, i, arr) => arr.indexOf(v) === i);
+
+  const filteredMentions = mentionDropdown
+    ? mentionCandidates.filter((u) =>
+        u.toLowerCase().startsWith(mentionQuery.toLowerCase()),
+      )
+    : [];
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+
+    // Detect @ mention
+    const lastAtIdx = val.lastIndexOf("@");
+    if (lastAtIdx !== -1) {
+      const afterAt = val.slice(lastAtIdx + 1);
+      // Only show if no space after @
+      if (!afterAt.includes(" ")) {
+        setMentionDropdown(true);
+        setMentionQuery(afterAt);
+        return;
+      }
+    }
+    setMentionDropdown(false);
+    setMentionQuery("");
+  };
+
+  const handleMentionSelect = (username: string) => {
+    const lastAtIdx = input.lastIndexOf("@");
+    const newInput = `${input.slice(0, lastAtIdx)}@${username} `;
+    setInput(newInput);
+    setMentionDropdown(false);
+    setMentionQuery("");
+    inputRef.current?.focus();
+  };
+
+  const checkMentionsInMessage = (content: string, sender: string) => {
+    if (!myUsername) return;
+    const mentionRegex = new RegExp(`@${myUsername}\\b`, "i");
+    if (mentionRegex.test(content)) {
+      toast(`🔔 You were mentioned by ${sender} in ${groupName ?? "chat"}`, {
+        duration: 5000,
+        style: {
+          background: "#2b4a1a",
+          border: "1px solid #3b9e5a",
+          color: "#e8f4fd",
+        },
+      });
+    }
+  };
+
+  const handleMediaClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    toast(`📎 ${file.name} — Media sending coming soon!`, {
+      duration: 3000,
+      style: {
+        background: "#1c2733",
+        border: "1px solid #2b5278",
+        color: "#e8f4fd",
+      },
+    });
+    // Reset so same file can be selected again
+    e.target.value = "";
+  };
+
+  const handleMicClick = async () => {
+    if (isRecording) {
+      // Stop recording
+      if (mediaStreamRef.current) {
+        for (const track of mediaStreamRef.current.getTracks()) track.stop();
+        mediaStreamRef.current = null;
+      }
+      setIsRecording(false);
+      toast("✅ Voice message sent!", {
+        duration: 2500,
+        style: {
+          background: "#1c2733",
+          border: "1px solid #3b9e5a",
+          color: "#e8f4fd",
+        },
+      });
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        mediaStreamRef.current = stream;
+        setIsRecording(true);
+        toast("🎤 Recording... tap again to stop", {
+          duration: 3000,
+          style: {
+            background: "#1c2733",
+            border: "1px solid #c15252",
+            color: "#e8f4fd",
+          },
+        });
+      } catch {
+        toast.error(
+          "❌ Mic access denied. Please allow microphone permission.",
+        );
+      }
+    }
+  };
+
   const handleSend = async () => {
     const content = input.trim();
     if (!content) return;
@@ -236,6 +444,7 @@ export default function ChatWindow({
     }
 
     setInput("");
+    setMentionDropdown(false);
 
     const username = myPrincipal?.toString().slice(0, 8) ?? "Collector";
     const principalStr = myPrincipal?.toString() ?? "";
@@ -251,6 +460,20 @@ export default function ChatWindow({
           if (!spawnedWaifu) {
             addBotMessage(
               "😅 No waifu right now! Keep chatting and one will appear soon~",
+            );
+          } else if (!arg) {
+            addBotMessage(
+              `🍀 A wild waifu appeared! Guess her name to claim her!\nType: /hunt <name>\nHint: She has ${RARITY_CONFIG[spawnedWaifu.rarity]?.icon ?? "🟢"} ${RARITY_CONFIG[spawnedWaifu.rarity]?.label ?? spawnedWaifu.rarity} rarity~`,
+            );
+          } else if (
+            !spawnedWaifu.name
+              .toLowerCase()
+              .trim()
+              .includes(arg.toLowerCase().trim()) &&
+            spawnedWaifu.name.toLowerCase().trim() !== arg.toLowerCase().trim()
+          ) {
+            addBotMessage(
+              `❌ Wrong name! That's not her. Hint: Her name starts with "${spawnedWaifu.name[0]}"~ Try again with /hunt <name>`,
             );
           } else {
             const caught = spawnedWaifu;
@@ -273,7 +496,16 @@ export default function ChatWindow({
               } catch {
                 // Silently add to local harem
               }
-              // +50 Onex (local balance boost via toast)
+              setLocalHaremIds((prev) => {
+                const updated = [...prev, caught.id];
+                try {
+                  localStorage.setItem(
+                    `sinzhu_local_harem_${groupName}`,
+                    JSON.stringify(updated),
+                  );
+                } catch {}
+                return updated;
+              });
               toast.success("+50 Onex earned! 💰", { duration: 2000 });
             }
             if (onNavigate) {
@@ -294,6 +526,28 @@ export default function ChatWindow({
                 );
               }, 1000);
             }
+          }
+          return;
+        }
+
+        case "/harem": {
+          const backendIds = harem.map((h) => h.characterId);
+          const allIds = Array.from(new Set([...backendIds, ...localHaremIds]));
+          if (allIds.length === 0) {
+            addBotMessage(
+              "🎴 Your harem is empty! Start hunting waifus with /hunt~ 🍀",
+            );
+          } else {
+            const haremChars = allIds
+              .map((id) => SEED_WAIFUS.find((w) => w.id === id))
+              .filter(Boolean);
+            const lines = haremChars.map((c) => {
+              const ri = RARITY_CONFIG[c!.rarity] ?? RARITY_CONFIG.common;
+              return `${ri.icon} ${c!.name} — ${ri.label}`;
+            });
+            addBotMessage(
+              `🎴 Your Harem Collection (${haremChars.length} waifus):\n${lines.join("\n")}`,
+            );
           }
           return;
         }
@@ -387,7 +641,7 @@ export default function ChatWindow({
         }
 
         case "/onex": {
-          const bal = 100; // local mock balance
+          const bal = 100;
           toast.info(`💸 Your Onex balance: ${bal} Onex`);
           return;
         }
@@ -518,13 +772,6 @@ export default function ChatWindow({
           }
           return;
         }
-
-        case "/harem": {
-          toast.success("🎴 Opening Harem...");
-          if (onNavigate) onNavigate("harem");
-          return;
-        }
-
         case "/shop": {
           toast.success("🛍️ Opening Shop...");
           if (onNavigate) onNavigate("shop");
@@ -580,8 +827,9 @@ export default function ChatWindow({
       }
     }
 
-    // Normal message
+    // Normal message — check for @mentions of current user
     if (isGroup && groupName) {
+      // Check if message mentions anyone in the group (we simulate other user detection via bot)
       try {
         await sendGroupMsg.mutateAsync({ groupName, content });
         msgCountRef.current += 1;
@@ -592,8 +840,8 @@ export default function ChatWindow({
           );
         }
 
-        // 20% chance bot replies
-        if (Math.random() < 0.2) {
+        // Bot replies to every message
+        if (Math.random() < 1.0) {
           const msg =
             BOT_CASUAL_MESSAGES[
               Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
@@ -621,6 +869,12 @@ export default function ChatWindow({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (mentionDropdown && filteredMentions.length > 0) {
+      if (e.key === "Escape") {
+        setMentionDropdown(false);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -741,14 +995,14 @@ export default function ChatWindow({
               src={spawnedWaifu.imageUrl}
               alt="?"
               className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-              style={{ filter: "blur(4px)" }}
             />
             <div className="flex-1">
               <p className="text-xs font-bold" style={{ color: "#87CEEB" }}>
                 ✨ Waifu Appeared!
               </p>
               <p className="text-sm text-white">
-                Type <span className="font-bold">/hunt</span> to claim!
+                Type <span className="font-bold">/hunt &lt;name&gt;</span> to
+                claim!
               </p>
             </div>
             <button
@@ -821,6 +1075,10 @@ export default function ChatWindow({
                   </div>
                 );
               }
+              // Check if this message mentions me
+              const mentionsMe = myUsername
+                ? new RegExp(`@${myUsername}\\b`, "i").test(msg.content)
+                : false;
               return (
                 <MessageBubble
                   key={msg.id ?? i}
@@ -829,6 +1087,15 @@ export default function ChatWindow({
                   timestamp={msg.timestamp}
                   isOwn={!!isOwn}
                   isGroup
+                  mentionsMe={mentionsMe}
+                  myUsername={myUsername}
+                  onRendered={() => {
+                    if (mentionsMe && !isOwn)
+                      checkMentionsInMessage(
+                        msg.content,
+                        msg.senderName || "Unknown",
+                      );
+                  }}
                 />
               );
             })
@@ -844,6 +1111,8 @@ export default function ChatWindow({
                   timestamp={msg.timestamp}
                   isOwn={!!isOwn}
                   isGroup={false}
+                  mentionsMe={false}
+                  myUsername={myUsername}
                 />
               );
             })}
@@ -927,9 +1196,46 @@ export default function ChatWindow({
 
       {/* Input bar */}
       <div
-        className="flex items-center gap-2 px-3 py-3 flex-shrink-0"
+        className="flex items-center gap-2 px-3 py-3 flex-shrink-0 relative"
         style={{ background: "#17212b", borderTop: "1px solid #1c2733" }}
       >
+        {/* @mention dropdown */}
+        <AnimatePresence>
+          {mentionDropdown && filteredMentions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="absolute bottom-full left-3 right-14 mb-2 rounded-xl overflow-hidden z-50"
+              style={{ background: "#1c2733", border: "1px solid #2b5278" }}
+              data-ocid="chat.mention.popover"
+            >
+              {filteredMentions.slice(0, 6).map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => handleMentionSelect(u)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:brightness-125"
+                  style={{ background: "transparent" }}
+                >
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ background: stringToColor(u) }}
+                  >
+                    {u[0]?.toUpperCase()}
+                  </div>
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: "#5288c1" }}
+                  >
+                    @{u}
+                  </span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {!identity ? (
           <div className="flex-1 flex items-center justify-center gap-3 py-2">
             <span className="text-sm" style={{ color: "#8eacbb" }}>
@@ -947,6 +1253,27 @@ export default function ChatWindow({
           </div>
         ) : (
           <>
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+
+            {/* Media button */}
+            <button
+              type="button"
+              onClick={handleMediaClick}
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:brightness-125"
+              style={{ background: "#1c2733", color: "#8eacbb" }}
+              data-ocid="chat.upload_button"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+
+            {/* Text input */}
             <input
               ref={inputRef}
               type="text"
@@ -954,7 +1281,7 @@ export default function ChatWindow({
                 isGroup ? PLACEHOLDER_HINTS[placeholderIdx] : "Message..."
               }
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
               style={{
@@ -964,18 +1291,35 @@ export default function ChatWindow({
               }}
               data-ocid="chat.message.input"
             />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={
-                !input.trim() || sendGroupMsg.isPending || sendDMMsg.isPending
-              }
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:brightness-110 disabled:opacity-40"
-              style={{ background: "#5288c1", flexShrink: 0 }}
-              data-ocid="chat.send.button"
-            >
-              <Send className="w-4 h-4 text-white" />
-            </button>
+
+            {/* Mic or Send button */}
+            {input.trim() ? (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sendGroupMsg.isPending || sendDMMsg.isPending}
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:brightness-110 disabled:opacity-40 flex-shrink-0"
+                style={{ background: "#5288c1" }}
+                data-ocid="chat.send.button"
+              >
+                <Send className="w-4 h-4 text-white" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleMicClick}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                  isRecording ? "animate-pulse" : "hover:brightness-125"
+                }`}
+                style={{
+                  background: isRecording ? "#c15252" : "#1c2733",
+                  color: isRecording ? "#ffffff" : "#8eacbb",
+                }}
+                data-ocid="chat.toggle"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            )}
           </>
         )}
       </div>
@@ -1002,16 +1346,16 @@ function BotMessageBubble({
   return (
     <div className="flex justify-start mb-1">
       <div className="flex items-start gap-2 max-w-xs md:max-w-sm lg:max-w-md">
-        {/* Bot avatar */}
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 mt-0.5"
-          style={{ background: "#5288c1" }}
-        >
-          🎀
+        <div className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 overflow-hidden">
+          <img
+            src="https://files.catbox.moe/vakg13.jpg"
+            alt="bot"
+            className="w-full h-full object-cover"
+          />
         </div>
         <div>
           <p className="text-xs font-bold mb-0.5" style={{ color: "#5288c1" }}>
-            SinzhuWaifu 🤖
+            🍀 sɪɴᴢʜᴜ ᴡᴀɪғᴜ ʙᴏᴛ 🍭
           </p>
           <div
             className="px-3 py-2 rounded-xl"
@@ -1030,17 +1374,13 @@ function BotMessageBubble({
                 <div className="relative flex-shrink-0">
                   <img
                     src={message.waifuCard.imageUrl}
-                    alt="???"
+                    alt="waifu"
                     className="w-14 h-20 rounded object-cover"
-                    style={{ filter: "blur(5px)" }}
                   />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl">❓</span>
-                  </div>
                 </div>
                 <div>
                   <p className="text-xs font-bold" style={{ color: "#87CEEB" }}>
-                    ??? (Hidden)
+                    🌸 Waifu Appeared!
                   </p>
                   <p className="text-xs" style={{ color: "#8eacbb" }}>
                     {RARITY_CONFIG[message.waifuCard.rarity]?.icon ?? "🟢"}{" "}
@@ -1051,7 +1391,7 @@ function BotMessageBubble({
                     className="text-xs mt-1 font-bold"
                     style={{ color: "#5288c1" }}
                   >
-                    Type /hunt to claim!
+                    /hunt &lt;name&gt; to claim!
                   </p>
                 </div>
               </div>
@@ -1081,20 +1421,36 @@ function MessageBubble({
   timestamp,
   isOwn,
   isGroup,
+  mentionsMe,
+  myUsername,
+  onRendered,
 }: {
   content: string;
   senderName: string;
   timestamp: bigint;
   isOwn: boolean;
   isGroup: boolean;
+  mentionsMe: boolean;
+  myUsername: string;
+  onRendered?: () => void;
 }) {
+  // Call onRendered once on mount to trigger notification logic
+  const renderedRef = useRef(false);
+  useEffect(() => {
+    if (!renderedRef.current && onRendered) {
+      renderedRef.current = true;
+      onRendered();
+    }
+  }, [onRendered]);
+
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-1`}>
       <div
         className="max-w-xs md:max-w-sm lg:max-w-md px-3 py-2 rounded-xl"
         style={{
-          background: isOwn ? "#2b5278" : "#182533",
+          background: mentionsMe ? "#2b3a1a" : isOwn ? "#2b5278" : "#182533",
           borderRadius: isOwn ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+          border: mentionsMe ? "1px solid #ffd700" : "none",
         }}
         data-ocid="chat.message.item"
       >
@@ -1107,7 +1463,7 @@ function MessageBubble({
           </p>
         )}
         <p className="text-sm break-words" style={{ color: "#e8f4fd" }}>
-          {content}
+          {renderMessageWithMentions(content, myUsername)}
         </p>
         <p
           className="text-right text-xs mt-0.5"
