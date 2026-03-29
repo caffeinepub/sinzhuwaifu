@@ -1,0 +1,901 @@
+import { Principal } from "@icp-sdk/core/principal";
+import {
+  BookUser,
+  MessageCircle,
+  Plus,
+  Search,
+  Settings,
+  User,
+  X,
+} from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
+import { toast } from "sonner";
+import type { ChatView, GamePage } from "../App";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import {
+  useCallerProfile,
+  useCreateGroup,
+  useGroups,
+  useJoinGroup,
+} from "../hooks/useQueries";
+
+interface ChatSidebarProps {
+  activeView: ChatView;
+  onSelectChat: (view: ChatView) => void;
+  onOpenProfile: () => void;
+}
+
+type BottomTab = "chats" | "contacts" | "settings" | "profile";
+
+const GAME_ITEMS: { page: GamePage; icon: string; label: string }[] = [
+  { page: "hunt", icon: "🎯", label: "Hunt" },
+  { page: "harem", icon: "💝", label: "Harem" },
+  { page: "shop", icon: "🛒", label: "Shop" },
+  { page: "daily", icon: "⭐", label: "Daily" },
+  { page: "leaderboard", icon: "🏆", label: "Ranks" },
+];
+
+export default function ChatSidebar({
+  activeView,
+  onSelectChat,
+  onOpenProfile,
+}: ChatSidebarProps) {
+  const { identity } = useInternetIdentity();
+  const { data: groups = [] } = useGroups();
+  const { data: profile } = useCallerProfile();
+  const createGroup = useCreateGroup();
+  const joinGroup = useJoinGroup();
+
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<BottomTab>("chats");
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeTab, setComposeTab] = useState<"create" | "join" | "dm">(
+    "create",
+  );
+  const [groupName, setGroupName] = useState("");
+  const [groupDesc, setGroupDesc] = useState("");
+  const [joinId, setJoinId] = useState("");
+  const [dmPrincipal, setDmPrincipal] = useState("");
+
+  const isActive = (view: ChatView) =>
+    JSON.stringify(view) === JSON.stringify(activeView);
+
+  const filteredGroups = groups.filter((g) =>
+    g.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const handleCreateGroup = async () => {
+    if (!groupName.trim()) {
+      toast.error("Group name required");
+      return;
+    }
+    if (!identity) {
+      toast.error("Please login first");
+      return;
+    }
+    try {
+      await createGroup.mutateAsync({
+        name: groupName.trim(),
+        description: groupDesc.trim(),
+        members: [identity.getPrincipal()],
+        createdBy: identity.getPrincipal(),
+        spawnInterval: BigInt(15),
+      });
+      toast.success(
+        `Group "${groupName.trim()}" created! ID: ${groupName.trim()}`,
+      );
+      setShowCompose(false);
+      setGroupName("");
+      setGroupDesc("");
+      onSelectChat({ type: "group", groupName: groupName.trim() });
+    } catch {
+      toast.error("Failed to create group.");
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (!joinId.trim()) {
+      toast.error("Group ID required");
+      return;
+    }
+    try {
+      await joinGroup.mutateAsync(joinId.trim());
+      toast.success(`Joined group: ${joinId.trim()}`);
+      setShowCompose(false);
+      setJoinId("");
+      onSelectChat({ type: "group", groupName: joinId.trim() });
+    } catch {
+      toast.error("Failed to join group.");
+    }
+  };
+
+  const handleOpenDM = () => {
+    if (!dmPrincipal.trim()) {
+      toast.error("Enter a Principal ID");
+      return;
+    }
+    try {
+      Principal.fromText(dmPrincipal.trim());
+      setShowCompose(false);
+      setDmPrincipal("");
+      onSelectChat({ type: "dm", principalStr: dmPrincipal.trim() });
+    } catch {
+      toast.error("Invalid Principal ID");
+    }
+  };
+
+  const displayName = profile?.displayName || profile?.username || "You";
+  const avatarLetter = displayName[0]?.toUpperCase() || "U";
+  let profilePicUrl = "";
+  try {
+    profilePicUrl = profile?.profilePic?.getDirectURL?.() || "";
+  } catch {}
+
+  const renderTabContent = () => {
+    if (activeTab === "chats") {
+      return (
+        <div className="flex-1 overflow-y-auto">
+          {/* Groups */}
+          {filteredGroups.length > 0 && (
+            <div>
+              <div
+                className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "#4a6278" }}
+              >
+                Groups
+              </div>
+              {filteredGroups.map((group) => {
+                const active = isActive({
+                  type: "group",
+                  groupName: group.name,
+                });
+                return (
+                  <button
+                    key={group.name}
+                    type="button"
+                    onClick={() =>
+                      onSelectChat({ type: "group", groupName: group.name })
+                    }
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+                    style={{ background: active ? "#2b5278" : "transparent" }}
+                    onMouseEnter={(e) => {
+                      if (!active)
+                        (e.currentTarget as HTMLElement).style.background =
+                          "#1c2733";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active)
+                        (e.currentTarget as HTMLElement).style.background =
+                          "transparent";
+                    }}
+                    data-ocid="sidebar.group.item"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div
+                        className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-base"
+                        style={{ background: stringToColor(group.name) }}
+                      >
+                        {group.name[0]?.toUpperCase()}
+                      </div>
+                      <span
+                        className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
+                        style={{
+                          background: "#3b9e5a",
+                          borderColor: active ? "#2b5278" : "#0e1621",
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="font-semibold text-sm truncate"
+                          style={{ color: "#e8f4fd" }}
+                        >
+                          {group.name}
+                        </span>
+                        <span
+                          className="text-xs ml-2 flex-shrink-0"
+                          style={{ color: "#4a6278" }}
+                        >
+                          {group.members.length} members
+                        </span>
+                      </div>
+                      <p
+                        className="text-xs truncate"
+                        style={{ color: "#8eacbb" }}
+                      >
+                        {group.description || "No description"}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {filteredGroups.length === 0 && !search && (
+            <div
+              className="px-4 py-6 text-center"
+              data-ocid="sidebar.groups.empty_state"
+            >
+              <div className="text-3xl mb-2">💬</div>
+              <p className="text-sm" style={{ color: "#4a6278" }}>
+                No groups yet
+              </p>
+              <p className="text-xs mt-1" style={{ color: "#2b3d54" }}>
+                Press + to create one
+              </p>
+            </div>
+          )}
+
+          {filteredGroups.length === 0 && search && (
+            <div
+              className="px-4 py-4 text-center"
+              data-ocid="sidebar.search.empty_state"
+            >
+              <p className="text-sm" style={{ color: "#4a6278" }}>
+                No groups found for "{search}"
+              </p>
+            </div>
+          )}
+
+          {/* Game Section */}
+          <div className="mt-2">
+            <div
+              className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: "#4a6278" }}
+            >
+              Game
+            </div>
+            {GAME_ITEMS.map((item) => {
+              const active =
+                activeView.type === "game" && activeView.page === item.page;
+              return (
+                <button
+                  key={item.page}
+                  type="button"
+                  onClick={() =>
+                    onSelectChat({ type: "game", page: item.page })
+                  }
+                  className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors"
+                  style={{ background: active ? "#2b5278" : "transparent" }}
+                  onMouseEnter={(e) => {
+                    if (!active)
+                      (e.currentTarget as HTMLElement).style.background =
+                        "#1c2733";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active)
+                      (e.currentTarget as HTMLElement).style.background =
+                        "transparent";
+                  }}
+                  data-ocid={`sidebar.${item.page}.tab`}
+                >
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                    style={{ background: "#182533" }}
+                  >
+                    {item.icon}
+                  </div>
+                  <span
+                    className="font-medium text-sm"
+                    style={{ color: active ? "#ffffff" : "#e8f4fd" }}
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Admin */}
+            <button
+              type="button"
+              onClick={() => onSelectChat({ type: "game", page: "admin" })}
+              className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors"
+              style={{
+                background:
+                  activeView.type === "game" && activeView.page === "admin"
+                    ? "#2b5278"
+                    : "transparent",
+              }}
+              onMouseEnter={(e) => {
+                if (
+                  !(activeView.type === "game" && activeView.page === "admin")
+                )
+                  (e.currentTarget as HTMLElement).style.background = "#1c2733";
+              }}
+              onMouseLeave={(e) => {
+                if (
+                  !(activeView.type === "game" && activeView.page === "admin")
+                )
+                  (e.currentTarget as HTMLElement).style.background =
+                    "transparent";
+              }}
+              data-ocid="sidebar.admin.tab"
+            >
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0"
+                style={{ background: "#182533" }}
+              >
+                ⚙️
+              </div>
+              <span
+                className="font-medium text-sm"
+                style={{ color: "#e8f4fd" }}
+              >
+                Admin
+              </span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeTab === "contacts") {
+      return (
+        <div className="flex-1 overflow-y-auto">
+          <div
+            className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
+            style={{ color: "#4a6278" }}
+          >
+            Contacts
+          </div>
+          {/* My Profile shortcut */}
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+            style={{ background: "transparent" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "#1c2733";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+            }}
+            data-ocid="contacts.my_profile.button"
+          >
+            <div className="relative flex-shrink-0">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white overflow-hidden"
+                style={{ background: "#5288c1" }}
+              >
+                {profilePicUrl ? (
+                  <img
+                    src={profilePicUrl}
+                    alt="avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  avatarLetter
+                )}
+              </div>
+              {identity && (
+                <span
+                  className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
+                  style={{ background: "#3b9e5a", borderColor: "#0e1621" }}
+                />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm" style={{ color: "#e8f4fd" }}>
+                {identity ? displayName : "Guest"}
+              </p>
+              <p className="text-xs" style={{ color: "#5288c1" }}>
+                My Profile
+              </p>
+            </div>
+          </button>
+
+          {/* New DM button */}
+          <button
+            type="button"
+            onClick={() => {
+              setComposeTab("dm");
+              setShowCompose(true);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+            style={{ background: "transparent" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "#1c2733";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+            }}
+            data-ocid="contacts.new_dm.button"
+          >
+            <div
+              className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "#182533" }}
+            >
+              <MessageCircle className="w-5 h-5" style={{ color: "#5288c1" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm" style={{ color: "#e8f4fd" }}>
+                New Message
+              </p>
+              <p className="text-xs" style={{ color: "#8eacbb" }}>
+                Send a direct message
+              </p>
+            </div>
+          </button>
+
+          <div
+            className="mx-4 my-3 rounded-xl p-4 text-center"
+            style={{ background: "#182533" }}
+          >
+            <p className="text-sm" style={{ color: "#8eacbb" }}>
+              To message someone, use their Principal ID from their Profile
+              page.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeTab === "settings") {
+      return (
+        <div className="flex-1 overflow-y-auto">
+          <div
+            className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
+            style={{ color: "#4a6278" }}
+          >
+            Settings
+          </div>
+
+          {/* Profile settings */}
+          <button
+            type="button"
+            onClick={onOpenProfile}
+            className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
+            style={{ background: "transparent" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "#1c2733";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+            }}
+            data-ocid="settings.profile.button"
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "#2b5278" }}
+            >
+              <User className="w-5 h-5" style={{ color: "#e8f4fd" }} />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm" style={{ color: "#e8f4fd" }}>
+                Edit Profile
+              </p>
+              <p className="text-xs" style={{ color: "#8eacbb" }}>
+                Name, photo, username, bio
+              </p>
+            </div>
+          </button>
+
+          {/* Game items */}
+          {GAME_ITEMS.map((item) => (
+            <button
+              key={item.page}
+              type="button"
+              onClick={() => onSelectChat({ type: "game", page: item.page })}
+              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
+              style={{ background: "transparent" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "#1c2733";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background =
+                  "transparent";
+              }}
+              data-ocid={`settings.${item.page}.button`}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                style={{ background: "#182533" }}
+              >
+                {item.icon}
+              </div>
+              <p className="font-semibold text-sm" style={{ color: "#e8f4fd" }}>
+                {item.label}
+              </p>
+            </button>
+          ))}
+
+          {/* Admin Panel */}
+          <button
+            type="button"
+            onClick={() => onSelectChat({ type: "game", page: "admin" })}
+            className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
+            style={{ background: "transparent" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "#1c2733";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+            }}
+            data-ocid="settings.admin.button"
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: "#182533" }}
+            >
+              🔐
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm" style={{ color: "#e8f4fd" }}>
+                Admin Panel
+              </p>
+              <p className="text-xs" style={{ color: "#8eacbb" }}>
+                Manage waifus, ads, shop
+              </p>
+            </div>
+          </button>
+        </div>
+      );
+    }
+
+    // profile tab
+    return (
+      <div className="flex-1 overflow-y-auto flex flex-col items-center pt-8 px-4">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex flex-col items-center gap-3"
+          data-ocid="bottomnav.profile.button"
+        >
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-3xl text-white overflow-hidden"
+            style={{
+              background: "#5288c1",
+              border: "3px solid #5288c1",
+              boxShadow: "0 0 20px rgba(82,136,193,0.4)",
+            }}
+          >
+            {profilePicUrl ? (
+              <img
+                src={profilePicUrl}
+                alt="avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              avatarLetter
+            )}
+          </div>
+          <div className="text-center">
+            <p className="font-bold text-lg" style={{ color: "#e8f4fd" }}>
+              {identity ? displayName : "Guest"}
+            </p>
+            <p
+              className="text-sm"
+              style={{ color: identity ? "#3b9e5a" : "#4a6278" }}
+            >
+              {identity ? "Online" : "Not logged in"}
+            </p>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="mt-6 w-full py-3 rounded-xl font-bold text-white transition-all hover:brightness-110"
+          style={{ background: "#5288c1" }}
+          data-ocid="bottomnav.edit_profile.button"
+        >
+          Edit Profile
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full" style={{ background: "#0e1621" }}>
+      {/* Top bar */}
+      <div
+        className="flex items-center gap-2 px-3 py-3"
+        style={{ borderBottom: "1px solid #1c2733" }}
+      >
+        <img
+          src="https://files.catbox.moe/vakg13.jpg"
+          alt="logo"
+          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+        />
+        <span
+          className="font-bold text-base flex-1"
+          style={{
+            background: "linear-gradient(90deg, #ffffff, #87CEEB, #00BFFF)",
+            backgroundSize: "200% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          SinzhuWaifu
+        </span>
+      </div>
+
+      {/* Search */}
+      {(activeTab === "chats" || activeTab === "contacts") && (
+        <div className="px-3 py-2">
+          <div
+            className="flex items-center gap-2 rounded-xl px-3 py-2"
+            style={{ background: "#182533" }}
+          >
+            <Search
+              className="w-4 h-4 flex-shrink-0"
+              style={{ color: "#8eacbb" }}
+            />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-500"
+              style={{ color: "#e8f4fd" }}
+              data-ocid="sidebar.search.input"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Tab content */}
+      {renderTabContent()}
+
+      {/* Bottom nav tabs — Telegram style */}
+      <div
+        className="flex items-center"
+        style={{ borderTop: "1px solid #1c2733", background: "#0e1621" }}
+      >
+        {[
+          {
+            id: "chats" as BottomTab,
+            icon: MessageCircle,
+            label: "Chats",
+            badge: groups.length > 0 ? groups.length : 0,
+          },
+          {
+            id: "contacts" as BottomTab,
+            icon: BookUser,
+            label: "Contacts",
+            badge: 0,
+          },
+          {
+            id: "settings" as BottomTab,
+            icon: Settings,
+            label: "Settings",
+            badge: 0,
+          },
+          {
+            id: "profile" as BottomTab,
+            icon: User,
+            label: "Profile",
+            badge: 0,
+          },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 relative transition-colors"
+            style={{ color: activeTab === tab.id ? "#5288c1" : "#8eacbb" }}
+            data-ocid={`bottomnav.${tab.id}.tab`}
+          >
+            <div className="relative">
+              <tab.icon className="w-5 h-5" />
+              {tab.badge > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+                  style={{ background: "#5288c1" }}
+                >
+                  {tab.badge}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-medium">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Blue FAB + button */}
+      <button
+        type="button"
+        onClick={() => {
+          setComposeTab("create");
+          setShowCompose(true);
+        }}
+        className="fixed bottom-20 right-4 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all hover:brightness-110 active:scale-95 z-30"
+        style={{
+          background: "#5288c1",
+          boxShadow: "0 4px 20px rgba(82,136,193,0.5)",
+        }}
+        data-ocid="fab.compose.button"
+      >
+        <Plus className="w-7 h-7 text-white" />
+      </button>
+
+      {/* Compose Modal */}
+      <AnimatePresence>
+        {showCompose && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)", cursor: "default" }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowCompose(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowCompose(false);
+            }}
+            data-ocid="compose.modal"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="rounded-2xl w-full max-w-sm"
+              style={{ background: "#17212b", border: "1px solid #2b3d54" }}
+            >
+              <div
+                className="flex items-center justify-between px-5 py-4"
+                style={{ borderBottom: "1px solid #1c2733" }}
+              >
+                <h2 className="font-bold text-white">New Chat</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowCompose(false)}
+                  style={{ color: "#8eacbb" }}
+                  data-ocid="compose.close_button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex border-b" style={{ borderColor: "#1c2733" }}>
+                {(["create", "join", "dm"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setComposeTab(t)}
+                    className="flex-1 py-2.5 text-sm font-semibold transition-colors"
+                    style={{
+                      color: composeTab === t ? "#5288c1" : "#8eacbb",
+                      borderBottom:
+                        composeTab === t
+                          ? "2px solid #5288c1"
+                          : "2px solid transparent",
+                    }}
+                    data-ocid={`compose.${t}.tab`}
+                  >
+                    {t === "create"
+                      ? "Create Group"
+                      : t === "join"
+                        ? "Join Group"
+                        : "Direct Message"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="p-5 flex flex-col gap-3">
+                {composeTab === "create" && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Group Name (this is the Group ID)"
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                      style={{
+                        background: "#182533",
+                        color: "#e8f4fd",
+                        border: "1px solid #2b3d54",
+                      }}
+                      data-ocid="compose.group_name.input"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description (optional)"
+                      value={groupDesc}
+                      onChange={(e) => setGroupDesc(e.target.value)}
+                      className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                      style={{
+                        background: "#182533",
+                        color: "#e8f4fd",
+                        border: "1px solid #2b3d54",
+                      }}
+                      data-ocid="compose.group_desc.input"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateGroup}
+                      disabled={createGroup.isPending}
+                      className="w-full py-2.5 rounded-xl font-bold text-white transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ background: "#5288c1" }}
+                      data-ocid="compose.create_group.submit_button"
+                    >
+                      {createGroup.isPending
+                        ? "Creating..."
+                        : "✅ Create Group"}
+                    </button>
+                  </>
+                )}
+                {composeTab === "join" && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Enter Group ID (group name)"
+                      value={joinId}
+                      onChange={(e) => setJoinId(e.target.value)}
+                      className="w-full rounded-xl px-4 py-2.5 text-sm outline-none"
+                      style={{
+                        background: "#182533",
+                        color: "#e8f4fd",
+                        border: "1px solid #2b3d54",
+                      }}
+                      data-ocid="compose.join_id.input"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleJoinGroup}
+                      disabled={joinGroup.isPending}
+                      className="w-full py-2.5 rounded-xl font-bold text-white transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ background: "#5288c1" }}
+                      data-ocid="compose.join_group.submit_button"
+                    >
+                      {joinGroup.isPending ? "Joining..." : "Join Group"}
+                    </button>
+                  </>
+                )}
+                {composeTab === "dm" && (
+                  <>
+                    <p className="text-xs" style={{ color: "#8eacbb" }}>
+                      Enter the Principal ID of the user you want to message.
+                      They can find it on their Profile page.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Principal ID (e.g. xxxxx-xxxxx-...)"
+                      value={dmPrincipal}
+                      onChange={(e) => setDmPrincipal(e.target.value)}
+                      className="w-full rounded-xl px-4 py-2.5 text-sm outline-none font-mono"
+                      style={{
+                        background: "#182533",
+                        color: "#e8f4fd",
+                        border: "1px solid #2b3d54",
+                      }}
+                      data-ocid="compose.dm_principal.input"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleOpenDM}
+                      className="w-full py-2.5 rounded-xl font-bold text-white transition-all hover:brightness-110"
+                      style={{ background: "#5288c1" }}
+                      data-ocid="compose.open_dm.submit_button"
+                    >
+                      Open DM
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++)
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const colors = [
+    "#2b5278",
+    "#3a7858",
+    "#7b4a8c",
+    "#8c5a3a",
+    "#3a5a8c",
+    "#8c3a5a",
+    "#4a7b3a",
+  ];
+  return colors[Math.abs(hash) % colors.length];
+}

@@ -1,0 +1,124 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Telegram-style dark theme */
+    --background: 0.12 0.02 220;
+    --foreground: 0.92 0.01 210;
+    --card: 0.15 0.025 220;
+    --card-foreground: 0.92 0.01 210;
+    --popover: 0.13 0.02 220;
+    --popover-foreground: 0.92 0.01 210;
+    --primary: 0.52 0.13 240;
+    --primary-foreground: 0.98 0.005 240;
+    --secondary: 0.18 0.03 220;
+    --secondary-foreground: 0.92 0.01 210;
+    --muted: 0.18 0.03 220;
+    --muted-foreground: 0.6 0.04 220;
+    --accent: 0.52 0.13 240;
+    --accent-foreground: 0.98 0.005 240;
+    --destructive: 0.55 0.18 22;
+    --destructive-foreground: 0.98 0.005 280;
+    --border: 0.2 0.035 220;
+    --input: 0.17 0.03 220;
+    --ring: 0.52 0.13 240;
+    --radius: 0.75rem;
+    --chart-1: 0.67 0.26 330;
+    --chart-2: 0.82 0.15 205;
+    --chart-3: 0.59 0.22 295;
+    --chart-4: 0.82 0.15 75;
+    --chart-5: 0.72 0.18 160;
+    --sidebar: 0.1 0.02 220;
+    --sidebar-foreground: 0.92 0.01 210;
+    --sidebar-primary: 0.52 0.13 240;
+    --sidebar-primary-foreground: 0.98 0.005 240;
+    --sidebar-accent: 0.15 0.025 220;
+    --sidebar-accent-foreground: 0.92 0.01 210;
+    --sidebar-border: 0.18 0.03 220;
+    --sidebar-ring: 0.52 0.13 240;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-jakarta;
+    background: #17212b;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0e1621;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2b3d54;
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #5288c1;
+  }
+}
+
+@layer utilities {
+  .glow-pink {
+    box-shadow: 0 0 20px oklch(0.67 0.26 330 / 0.4), 0 0 40px
+      oklch(0.67 0.26 330 / 0.2);
+  }
+  .glow-cyan {
+    box-shadow: 0 0 20px oklch(0.82 0.15 205 / 0.4), 0 0 40px
+      oklch(0.82 0.15 205 / 0.2);
+  }
+  .glow-purple {
+    box-shadow: 0 0 20px oklch(0.59 0.22 295 / 0.4), 0 0 40px
+      oklch(0.59 0.22 295 / 0.2);
+  }
+  .glow-gold {
+    box-shadow: 0 0 20px oklch(0.82 0.15 75 / 0.5), 0 0 40px
+      oklch(0.82 0.15 75 / 0.25);
+  }
+  .text-gradient-pink-cyan {
+    background: linear-gradient(
+      135deg,
+      oklch(0.75 0.22 330),
+      oklch(0.82 0.15 205)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .btn-pink {
+    background: linear-gradient(
+      135deg,
+      oklch(0.67 0.26 330),
+      oklch(0.6 0.23 300)
+    );
+    color: white;
+    box-shadow: 0 4px 15px oklch(0.67 0.26 330 / 0.35);
+  }
+  .btn-pink:hover {
+    box-shadow: 0 6px 20px oklch(0.67 0.26 330 / 0.5);
+    filter: brightness(1.08);
+  }
+  .btn-violet {
+    background: oklch(0.15 0.03 240 / 0.8);
+    border: 1px solid oklch(0.25 0.06 240 / 0.6);
+    color: oklch(0.82 0.1 240);
+  }
+  .btn-violet:hover {
+    background: oklch(0.2 0.04 240);
+    border-color: oklch(0.52 0.13 240 / 0.5);
+  }
+}
