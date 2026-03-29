@@ -5,7 +5,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { WaifuCharacter } from "../backend";
 import WaifuCard from "../components/WaifuCard";
-import { RARITY_CONFIG, SEED_WAIFUS } from "../data/seedData";
+import {
+  RARITY_CONFIG,
+  RARITY_SELL_PRICES,
+  SEED_WAIFUS,
+} from "../data/seedData";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useCallerProfile,
@@ -38,9 +42,7 @@ export default function Harem({ onNavigate }: HaremProps) {
   const { data: profile } = useCallerProfile();
   const saveProfile = useSaveProfile();
 
-  const [filter, setFilter] = useState<
-    "all" | "favorites" | "legendary" | "epic" | "rare"
-  >("all");
+  const [filter, setFilter] = useState<string>("all");
   const [localHarem, setLocalHarem] = useState<
     { id: string; isFavorite: boolean }[]
   >([
@@ -83,8 +85,7 @@ export default function Harem({ onNavigate }: HaremProps) {
   const sellWaifu = async (characterId: string) => {
     const char = allCharacters.find((c) => c.id === characterId);
     if (!char) return;
-    const rarity = RARITY_CONFIG[char.rarity] ?? RARITY_CONFIG.common;
-    const sellPrice = rarity.stars * 50;
+    const sellPrice = RARITY_SELL_PRICES[char.rarity] ?? 10;
     setLocalHarem((prev) => prev.filter((h) => h.id !== characterId));
     if (profile) {
       try {
@@ -102,9 +103,12 @@ export default function Harem({ onNavigate }: HaremProps) {
   const FILTERS = [
     { value: "all", label: "All" },
     { value: "favorites", label: "💝 Faves" },
-    { value: "legendary", label: "⭐ Legendary" },
-    { value: "epic", label: "💜 Epic" },
-    { value: "rare", label: "💙 Rare" },
+    { value: "god", label: "🌟 God" },
+    { value: "limited", label: "🔮 Limited" },
+    { value: "premium", label: "💎 Premium" },
+    { value: "legendary", label: "🟡 Legend" },
+    { value: "rare", label: "🟠 Rare" },
+    { value: "common", label: "🟢 Common" },
   ] as const;
 
   return (

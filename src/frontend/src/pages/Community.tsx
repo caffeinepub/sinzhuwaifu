@@ -15,6 +15,8 @@ import { Principal } from "@icp-sdk/core/principal";
 import {
   ArrowLeft,
   MessageCircle,
+  Mic,
+  Paperclip,
   Plus,
   Search,
   Send,
@@ -73,6 +75,40 @@ function formatTime(ts: bigint) {
   });
 }
 
+function renderMessageContent(content: string) {
+  if (content.startsWith("[VOICE]:")) {
+    const src = content.slice("[VOICE]:".length);
+    return (
+      <audio
+        controls
+        src={src}
+        className="max-w-full"
+        style={{ height: "36px", minWidth: "180px" }}
+      >
+        <track kind="captions" />
+      </audio>
+    );
+  }
+  if (content.startsWith("[MEDIA]:")) {
+    const src = content.slice("[MEDIA]:".length);
+    if (src.startsWith("data:video")) {
+      return (
+        <video controls src={src} className="max-w-full rounded-lg max-h-48">
+          <track kind="captions" />
+        </video>
+      );
+    }
+    return (
+      <img
+        src={src}
+        alt="media"
+        className="max-w-full rounded-lg max-h-48 object-cover"
+      />
+    );
+  }
+  return <span>{content}</span>;
+}
+
 interface GroupChatProps {
   groupName: string;
   memberCount: number;
@@ -81,7 +117,7 @@ interface GroupChatProps {
 
 function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
   const { identity } = useInternetIdentity();
-  const { data: messages } = useGetGroupMessages(groupName);
+  const { data: backendMessages } = useGetGroupMessages(groupName);
   const sendMsg = useSendGroupMessage();
   const huntWaifu = useHuntWaifuInGroup();
   const addMember = useAddMemberToGroup();
@@ -89,15 +125,100 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
   const [input, setInput] = useState("");
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [memberPrincipal, setMemberPrincipal] = useState("");
+  const [localMessages, setLocalMessages] = useState<GroupMessage[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const myPrincipal = identity?.getPrincipal().toString();
+  const localStorageKey = `groupMessages_${groupName}`;
 
-  const msgCount = messages?.length ?? 0;
+  // Load local messages from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(localStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setLocalMessages(
+          parsed.map((m: any) => ({
+            ...m,
+            timestamp: BigInt(m.timestamp),
+            senderPrincipal: {
+              toString: () => m.senderPrincipalStr || "anonymous",
+            },
+          })),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [localStorageKey]);
+
+  // Merge backend + local messages, deduplicate by id
+  const allMessages: GroupMessage[] = (() => {
+    const backendIds = new Set((backendMessages ?? []).map((m) => m.id));
+    const localOnly = localMessages.filter((m) => !backendIds.has(m.id));
+    const combined = [...(backendMessages ?? []), ...localOnly];
+    combined.sort((a, b) => {
+      const diff = Number(a.timestamp) - Number(b.timestamp);
+      return diff;
+    });
+    return combined;
+  })();
+
+  const msgCount = allMessages.length;
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgCount]);
+
+  const saveLocalMessage = (msg: GroupMessage, principalStr: string) => {
+    setLocalMessages((prev) => {
+      const next = [...prev, msg];
+      try {
+        const serializable = next.map((m) => ({
+          ...m,
+          timestamp: m.timestamp.toString(),
+          senderPrincipalStr: principalStr,
+          senderPrincipal: undefined,
+        }));
+        localStorage.setItem(localStorageKey, JSON.stringify(serializable));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const sendContent = async (content: string) => {
+    const localProfile = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("userProfile") || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    const principalStr = myPrincipal || "anonymous";
+
+    try {
+      await sendMsg.mutateAsync({ groupName, content });
+    } catch {
+      // Fallback: save locally
+      const localMsg: GroupMessage = {
+        id: `local_${Date.now()}_${Math.random()}`,
+        groupName,
+        senderPrincipal: { toString: () => principalStr } as any,
+        senderName: localProfile?.name || "You",
+        content,
+        timestamp: BigInt(Date.now() * 1_000_000),
+        isWaifuSpawn: false,
+        waifuCharacterId: "",
+      };
+      saveLocalMessage(localMsg, principalStr);
+    }
+  };
 
   const handleSend = async () => {
     const content = input.trim();
@@ -118,11 +239,61 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
       return;
     }
 
+    await sendContent(content);
+  };
+
+  // Voice recording
+  const startRecording = async () => {
     try {
-      await sendMsg.mutateAsync({ groupName, content });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        for (const t of stream.getTracks()) {
+          t.stop();
+        }
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const dataUrl = reader.result as string;
+          await sendContent(`[VOICE]:${dataUrl}`);
+        };
+        reader.readAsDataURL(blob);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
     } catch {
-      toast.error("Failed to send message.");
+      toast.error("Mic permission denied");
     }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // Media upload
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File too large (max 5MB)");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const dataUrl = reader.result as string;
+      await sendContent(`[MEDIA]:${dataUrl}`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAddMember = async () => {
@@ -137,9 +308,6 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
       toast.error("Invalid principal ID or failed to add member.");
     }
   };
-
-  const displayMessages: GroupMessage[] =
-    messages && messages.length > 0 ? messages : [];
 
   return (
     <div className="flex flex-col h-[calc(100vh-180px)] min-h-[500px]">
@@ -232,7 +400,7 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
         className="flex-1 px-4 py-3"
         style={{ background: "oklch(0.09 0.02 290)" }}
       >
-        {displayMessages.length === 0 ? (
+        {allMessages.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm"
             data-ocid="community.messages.empty_state"
@@ -242,7 +410,7 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
           </div>
         ) : (
           <div className="space-y-2 pb-2">
-            {displayMessages.map((msg) => {
+            {allMessages.map((msg) => {
               const isMe =
                 myPrincipal && msg.senderPrincipal?.toString() === myPrincipal;
               if (msg.isWaifuSpawn) {
@@ -304,7 +472,7 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
                           : "1px solid oklch(0.22 0.055 290)",
                       }}
                     >
-                      {msg.content}
+                      {renderMessageContent(msg.content)}
                     </div>
                     <span className="text-xs text-muted-foreground mx-1">
                       {formatTime(msg.timestamp)}
@@ -320,12 +488,55 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
 
       {/* Input */}
       <div
-        className="flex gap-2 p-3 rounded-b-2xl"
+        className="flex gap-2 p-3 rounded-b-2xl items-center"
         style={{
           background: "oklch(0.13 0.035 290)",
           borderTop: "1px solid oklch(0.22 0.055 290)",
         }}
       >
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          className="hidden"
+          onChange={handleFileSelect}
+          data-ocid="community.group_chat.dropzone"
+        />
+
+        {/* Paperclip / media button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="p-2 rounded-xl transition-colors shrink-0"
+          style={{ color: "oklch(0.75 0.18 295)" }}
+          title="Send media"
+          data-ocid="community.group_chat.upload_button"
+        >
+          <Paperclip className="w-5 h-5" />
+        </button>
+
+        {/* Mic / voice button */}
+        <button
+          type="button"
+          onMouseDown={startRecording}
+          onMouseUp={stopRecording}
+          onTouchStart={startRecording}
+          onTouchEnd={stopRecording}
+          className="p-2 rounded-xl transition-all shrink-0 select-none"
+          style={{
+            color: isRecording ? "oklch(0.65 0.25 25)" : "oklch(0.75 0.18 295)",
+            background: isRecording
+              ? "oklch(0.65 0.25 25 / 0.15)"
+              : "transparent",
+            animation: isRecording ? "pulse 1s infinite" : "none",
+          }}
+          title="Hold to record voice"
+          data-ocid="community.group_chat.toggle"
+        >
+          <Mic className="w-5 h-5" />
+        </button>
+
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -335,14 +546,19 @@ function GroupChat({ groupName, memberCount, onBack }: GroupChatProps) {
               handleSend();
             }
           }}
-          placeholder="Type a message or /hunt..."
+          placeholder={
+            isRecording
+              ? "🔴 Recording... release to send"
+              : "Type a message or /hunt..."
+          }
           style={{ background: "oklch(0.10 0.025 290)" }}
+          disabled={isRecording}
           data-ocid="community.group_chat.input"
         />
         <Button
           className="btn-pink px-3 shrink-0"
           onClick={handleSend}
-          disabled={sendMsg.isPending || huntWaifu.isPending}
+          disabled={sendMsg.isPending || huntWaifu.isPending || isRecording}
           data-ocid="community.group_chat.submit_button"
         >
           <Send className="w-4 h-4" />

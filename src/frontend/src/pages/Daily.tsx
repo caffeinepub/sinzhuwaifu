@@ -39,22 +39,11 @@ function formatCooldown(key: string): string {
   return `${hours}h ${minutes}m`;
 }
 
-type Page =
-  | "home"
-  | "hunt"
-  | "harem"
-  | "shop"
-  | "daily"
-  | "leaderboard"
-  | "community"
-  | "profile"
-  | "admin";
-
 interface DailyProps {
-  onNavigate: (page: Page) => void;
+  onNavigate: (page: string) => void;
 }
 
-export default function Daily({ onNavigate: _onNavigate }: DailyProps) {
+export default function Daily({ onNavigate }: DailyProps) {
   const { identity, login } = useInternetIdentity();
   const { data: profile } = useCallerProfile();
   const { data: characters } = useWaifuCharacters();
@@ -324,6 +313,48 @@ export default function Daily({ onNavigate: _onNavigate }: DailyProps) {
           })}
         </div>
       </motion.div>
+
+      <div className="mt-6 px-4 pb-6">
+        <p className="text-xs text-center mb-3" style={{ color: "#4a6278" }}>
+          Other Daily Rewards
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate("welkin")}
+            className="flex items-center gap-2 p-3 rounded-xl transition-all hover:brightness-110"
+            style={{ background: "#1c2733", border: "1px solid #2b3d54" }}
+            data-ocid="daily.welkin.button"
+          >
+            <span className="text-2xl">🗓</span>
+            <div className="text-left">
+              <p className="font-bold text-sm" style={{ color: "#e8f4fd" }}>
+                Welkin
+              </p>
+              <p className="text-xs" style={{ color: "#8eacbb" }}>
+                +150 Onex daily
+              </p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("treasure")}
+            className="flex items-center gap-2 p-3 rounded-xl transition-all hover:brightness-110"
+            style={{ background: "#1c2733", border: "1px solid #2b3d54" }}
+            data-ocid="daily.treasure.button"
+          >
+            <span className="text-2xl">🪅</span>
+            <div className="text-left">
+              <p className="font-bold text-sm" style={{ color: "#e8f4fd" }}>
+                Treasure
+              </p>
+              <p className="text-xs" style={{ color: "#8eacbb" }}>
+                Random rewards
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

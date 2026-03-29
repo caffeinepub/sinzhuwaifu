@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Zap } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -12,7 +11,6 @@ import {
 
 type Page =
   | "home"
-  | "hunt"
   | "harem"
   | "shop"
   | "daily"
@@ -270,14 +268,6 @@ export default function Home({ onNavigate }: HomeProps) {
         transition={{ duration: 0.4, delay: 0.3 }}
         className="w-full flex flex-col gap-3"
       >
-        <Button
-          className="btn-pink w-full py-6 text-base font-bold h-auto"
-          onClick={() => onNavigate("hunt")}
-          data-ocid="home.start_hunting.primary_button"
-        >
-          <Zap className="w-5 h-5 mr-2" />
-          Start Hunting 🍀
-        </Button>
         <div className="grid grid-cols-3 gap-2">
           <Button
             variant="outline"
@@ -331,17 +321,15 @@ export default function Home({ onNavigate }: HomeProps) {
             data-ocid="home.waifus.list"
           >
             {characters.map((char, i) => (
-              <button
+              <div
                 key={char.id}
-                type="button"
-                className="rounded-xl overflow-hidden flex flex-col text-left"
+                className="rounded-xl overflow-hidden flex flex-col"
                 style={{
                   background:
                     "linear-gradient(135deg, oklch(0.14 0.035 290 / 0.9), oklch(0.11 0.03 290 / 0.8))",
                   border: "1px solid oklch(0.22 0.055 290)",
                   boxShadow: "0 12px 30px oklch(0 0 0 / 0.35)",
                 }}
-                onClick={() => onNavigate("hunt")}
                 data-ocid={`home.waifus.item.${i + 1}`}
               >
                 <img
@@ -355,7 +343,7 @@ export default function Home({ onNavigate }: HomeProps) {
                     {char.name}
                   </p>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </motion.section>

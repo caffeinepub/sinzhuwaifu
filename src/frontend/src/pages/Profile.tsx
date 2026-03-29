@@ -8,6 +8,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ExternalBlob } from "../backend";
+import { getRankForCount } from "../data/seedData";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useCallerProfile,
@@ -159,6 +160,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
     };
 
   const haremCount = harem?.length ?? 0;
+  const currentRank = getRankForCount(haremCount);
   const favoriteCount = harem?.filter((h) => h.isFavorite).length ?? 0;
   const joinDate = new Date(
     Number(displayData.joinDate) / 1_000_000,
@@ -384,9 +386,29 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {displayData.bio || "No bio yet — add one!"}
-              </p>
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {displayData.bio || "No bio yet — add one!"}
+                </p>
+                <div
+                  className="flex items-center gap-2 mt-2 px-3 py-1.5 rounded-full w-fit"
+                  style={{
+                    background: `${currentRank.color}20`,
+                    border: `1px solid ${currentRank.color}50`,
+                  }}
+                >
+                  <span className="text-sm">{currentRank.icon}</span>
+                  <span
+                    className="text-xs font-bold"
+                    style={{ color: currentRank.color }}
+                  >
+                    {currentRank.name}
+                  </span>
+                  <span className="text-xs" style={{ color: "#8eacbb" }}>
+                    • {haremCount} waifus
+                  </span>
+                </div>
+              </>
             )}
           </div>
 

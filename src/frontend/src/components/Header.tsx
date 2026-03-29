@@ -71,7 +71,7 @@ export default function Header({ currentPage, onNavigate }: HeaderProps) {
         >
           <div className="relative">
             <img
-              src="/assets/generated/sinzhu-logo-transparent.dim_120x120.png"
+              src="https://files.catbox.moe/lasj0e.jpg"
               alt="SinzhuWaifu"
               className="w-9 h-9 rounded-full object-cover"
               style={{ boxShadow: "0 0 12px oklch(0.67 0.26 330 / 0.6)" }}

@@ -4,20 +4,41 @@ import { useState } from "react";
 import ChatSidebar from "./components/ChatSidebar";
 import ChatWindow from "./components/ChatWindow";
 import TelegramProfile from "./components/TelegramProfile";
+import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import Admin from "./pages/Admin";
+import CheckPage from "./pages/CheckPage";
 import Daily from "./pages/Daily";
+import GiftPage from "./pages/GiftPage";
 import Harem from "./pages/Harem";
-import Hunt from "./pages/Hunt";
+import HclaimPage from "./pages/HclaimPage";
 import Leaderboard from "./pages/Leaderboard";
+import PayPage from "./pages/PayPage";
+import RankPage from "./pages/RankPage";
 import Shop from "./pages/Shop";
+import TopGroupsPage from "./pages/TopGroupsPage";
+import TopPage from "./pages/TopPage";
+import TopsPage from "./pages/TopsPage";
+import TreasurePage from "./pages/TreasurePage";
+import WaifuPass from "./pages/WaifuPass";
+import WelkinPage from "./pages/WelkinPage";
 
 export type GamePage =
-  | "hunt"
   | "harem"
   | "shop"
   | "daily"
   | "leaderboard"
-  | "admin";
+  | "admin"
+  | "waifupass"
+  | "rank"
+  | "gift"
+  | "check"
+  | "pay"
+  | "top"
+  | "topgroups"
+  | "tops"
+  | "welkin"
+  | "treasure"
+  | "hclaim";
 
 export type ChatView =
   | { type: "welcome" }
@@ -28,9 +49,107 @@ export type ChatView =
 
 type AnyPage = string;
 
+function LoadingScreen() {
+  return (
+    <div
+      className="flex h-screen w-screen items-center justify-center"
+      style={{ background: "#17212b" }}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div
+          className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin"
+          style={{ borderColor: "#2481cc", borderTopColor: "transparent" }}
+        />
+        <p className="text-sm" style={{ color: "#8eacbb" }}>
+          Loading...
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  return (
+    <div
+      className="flex h-screen w-screen items-center justify-center"
+      style={{ background: "#0e1621" }}
+      data-ocid="login.panel"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex flex-col items-center gap-5 px-6"
+        style={{ maxWidth: 360, width: "100%" }}
+      >
+        {/* Logo */}
+        <div
+          className="w-20 h-20 rounded-full overflow-hidden"
+          style={{
+            boxShadow: "0 0 0 3px #2481cc, 0 0 20px 4px rgba(36,129,204,0.35)",
+          }}
+        >
+          <img
+            src="https://files.catbox.moe/lasj0e.jpg"
+            alt="SinzhuWaifu Logo"
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        {/* App name */}
+        <div className="flex flex-col items-center gap-1">
+          <h1
+            className="text-2xl font-bold text-center"
+            style={{
+              background:
+                "linear-gradient(90deg, #ffffff 0%, #54c2f0 60%, #2481cc 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              lineHeight: 1.3,
+            }}
+          >
+            🍀 sɪɴᴢʜᴜ ᴡᴀɪғᴜ ʙᴏᴛ 🍭
+          </h1>
+          <p className="text-sm" style={{ color: "#8eacbb" }}>
+            Sign in to continue
+          </p>
+        </div>
+
+        {/* Login button */}
+        <button
+          type="button"
+          onClick={onLogin}
+          data-ocid="login.primary_button"
+          className="w-full rounded-xl py-3 text-white font-semibold text-base transition-opacity hover:opacity-90 active:opacity-75"
+          style={{ background: "#2481cc", maxWidth: 320 }}
+        >
+          🔑 Login with Google
+        </button>
+
+        {/* Powered by note */}
+        <p className="text-xs" style={{ color: "#4a6378" }}>
+          Powered by Internet Identity
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function App() {
+  const { identity, isInitializing, login } = useInternetIdentity();
   const [activeView, setActiveView] = useState<ChatView>({ type: "welcome" });
   const [showSidebar, setShowSidebar] = useState(true);
+
+  // Auth gate
+  if (isInitializing) {
+    return <LoadingScreen />;
+  }
+
+  const isAnon = !identity || identity.getPrincipal().isAnonymous();
+  if (isAnon) {
+    return <LoginScreen onLogin={login} />;
+  }
 
   const handleSelectChat = (view: ChatView) => {
     setActiveView(view);
@@ -41,17 +160,13 @@ export default function App() {
     setShowSidebar(true);
   };
 
-  // Universal navigation handler compatible with pages' (page: Page) => void
   const handleNavigate = (page: AnyPage) => {
     if (page === "profile") {
       setActiveView({ type: "profile" });
       setShowSidebar(false);
-    } else if (page === "community") {
+    } else if (page === "community" || page === "home") {
       setActiveView({ type: "welcome" });
-      setShowSidebar(false);
-    } else if (page === "home") {
-      setActiveView({ type: "welcome" });
-      setShowSidebar(false);
+      setShowSidebar(true);
     } else {
       const gamePage = page as GamePage;
       setActiveView({ type: "game", page: gamePage });
@@ -68,15 +183,8 @@ export default function App() {
 
     if (activeView.type === "game") {
       const wrapperClass = "flex flex-col h-full overflow-y-auto";
-      // Cast to any to satisfy pages' local Page type — safe since handleNavigate handles all values
       const nav = handleNavigate as (page: any) => void;
       switch (activeView.page) {
-        case "hunt":
-          return (
-            <div className={wrapperClass}>
-              <Hunt onNavigate={nav} />
-            </div>
-          );
         case "harem":
           return (
             <div className={wrapperClass}>
@@ -107,15 +215,105 @@ export default function App() {
               <Admin />
             </div>
           );
+        case "waifupass":
+          return (
+            <div className={wrapperClass}>
+              <WaifuPass onNavigate={nav} />
+            </div>
+          );
+        case "rank":
+          return (
+            <div className={wrapperClass}>
+              <RankPage onNavigate={nav} />
+            </div>
+          );
+        case "gift":
+          return (
+            <div className={wrapperClass}>
+              <GiftPage onNavigate={nav} />
+            </div>
+          );
+        case "check":
+          return (
+            <div className={wrapperClass}>
+              <CheckPage onNavigate={nav} />
+            </div>
+          );
+        case "pay":
+          return (
+            <div className={wrapperClass}>
+              <PayPage onNavigate={nav} />
+            </div>
+          );
+        case "top":
+          return (
+            <div className={wrapperClass}>
+              <TopPage onNavigate={nav} />
+            </div>
+          );
+        case "topgroups":
+          return (
+            <div className={wrapperClass}>
+              <TopGroupsPage onNavigate={nav} />
+            </div>
+          );
+        case "tops":
+          return (
+            <div className={wrapperClass}>
+              <TopsPage onNavigate={nav} />
+            </div>
+          );
+        case "welkin":
+          return (
+            <div className={wrapperClass}>
+              <WelkinPage onNavigate={nav} />
+            </div>
+          );
+        case "treasure":
+          return (
+            <div className={wrapperClass}>
+              <TreasurePage onNavigate={nav} />
+            </div>
+          );
+        case "hclaim":
+          return (
+            <div className={wrapperClass}>
+              <HclaimPage onNavigate={nav} />
+            </div>
+          );
       }
     }
 
     if (activeView.type === "group" || activeView.type === "dm") {
-      return <ChatWindow activeView={activeView} onBack={handleBack} />;
+      return (
+        <ChatWindow
+          activeView={activeView}
+          onBack={handleBack}
+          onNavigate={handleNavigate}
+        />
+      );
     }
 
-    // Welcome screen
-    return <WelcomeScreen onNavigate={handleNavigate} />;
+    // welcome / empty state — Telegram-style empty right panel
+    return (
+      <div
+        className="flex-1 flex flex-col items-center justify-center h-full select-none"
+        style={{ background: "#17212b" }}
+      >
+        <div className="flex flex-col items-center gap-3 opacity-30">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center"
+            style={{ border: "2px solid #8eacbb" }}
+            aria-hidden="true"
+          >
+            <span style={{ fontSize: 28, lineHeight: 1 }}>💬</span>
+          </div>
+          <p className="text-sm" style={{ color: "#8eacbb" }}>
+            Select a chat to start messaging
+          </p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -123,7 +321,6 @@ export default function App() {
       className="flex h-screen w-screen overflow-hidden"
       style={{ background: "#17212b" }}
     >
-      {/* Sidebar */}
       <div
         className={[
           "flex-shrink-0 flex-col",
@@ -142,7 +339,6 @@ export default function App() {
         />
       </div>
 
-      {/* Main Panel */}
       <div
         className={[
           "flex-1 flex-col overflow-hidden",
@@ -175,163 +371,6 @@ export default function App() {
           },
         }}
       />
-    </div>
-  );
-}
-
-function WelcomeScreen({ onNavigate }: { onNavigate: (page: string) => void }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center h-full select-none">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col items-center gap-6 px-6 text-center"
-      >
-        <style>{`
-          @keyframes shimmer-sky {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-          }
-          @keyframes float-rainbow {
-            0%, 100% { transform: translateY(-50%) rotate(0deg); }
-            50% { transform: translateY(calc(-50% - 8px)) rotate(12deg); }
-          }
-          @keyframes rain-drop {
-            0% { opacity: 1; transform: translateY(0px); }
-            100% { opacity: 0; transform: translateY(28px); }
-          }
-          @keyframes float-cloud {
-            0%, 100% { transform: translateX(0px); }
-            50% { transform: translateX(7px); }
-          }
-        `}</style>
-
-        <div className="relative inline-block" style={{ padding: "8px 52px" }}>
-          <span
-            style={{
-              position: "absolute",
-              left: 4,
-              top: "50%",
-              fontSize: 24,
-              animation: "float-rainbow 3s ease-in-out infinite",
-              display: "inline-block",
-            }}
-          >
-            🌈
-          </span>
-          <span
-            style={{
-              position: "absolute",
-              right: 0,
-              top: -4,
-              fontSize: 18,
-              animation: "float-cloud 4s ease-in-out infinite",
-              display: "inline-block",
-            }}
-          >
-            ☁️
-          </span>
-          <span
-            style={{
-              position: "absolute",
-              right: 14,
-              bottom: 2,
-              fontSize: 14,
-              animation: "rain-drop 1.3s ease-in infinite",
-              display: "inline-block",
-            }}
-          >
-            💧
-          </span>
-          <span
-            style={{
-              position: "absolute",
-              right: 28,
-              bottom: 6,
-              fontSize: 11,
-              animation: "rain-drop 1.3s ease-in 0.45s infinite",
-              display: "inline-block",
-            }}
-          >
-            💧
-          </span>
-          <h1
-            className="text-5xl font-extrabold tracking-wide"
-            style={{
-              background:
-                "linear-gradient(90deg, #ffffff, #87CEEB, #00BFFF, #e0f7ff, #ffffff)",
-              backgroundSize: "200% auto",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              animation: "shimmer-sky 3s linear infinite",
-              filter:
-                "drop-shadow(0 0 10px rgba(135,206,235,0.95)) drop-shadow(0 0 22px rgba(0,191,255,0.6))",
-            }}
-          >
-            Sinzhu Wafu
-          </h1>
-        </div>
-
-        <p style={{ color: "#8eacbb" }} className="text-sm">
-          Collect. Hunt. Dominate.
-        </p>
-
-        <img
-          src="https://files.catbox.moe/vakg13.jpg"
-          alt="SinzhuWaifu"
-          className="w-24 h-24 rounded-full object-cover"
-          style={{
-            border: "3px solid #5288c1",
-            boxShadow: "0 0 20px rgba(82,136,193,0.4)",
-          }}
-        />
-
-        <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
-          <button
-            type="button"
-            onClick={() => onNavigate("hunt")}
-            className="w-full py-3 rounded-xl font-bold text-white transition-all hover:brightness-110"
-            style={{ background: "#5288c1" }}
-            data-ocid="welcome.hunt.primary_button"
-          >
-            🎯 Start Hunting
-          </button>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => onNavigate("harem")}
-              className="py-2.5 rounded-xl font-semibold text-white transition-all hover:brightness-110"
-              style={{ background: "#1c2f45" }}
-              data-ocid="welcome.harem.secondary_button"
-            >
-              💝 Harem
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate("daily")}
-              className="py-2.5 rounded-xl font-semibold text-white transition-all hover:brightness-110"
-              style={{ background: "#1c2f45" }}
-              data-ocid="welcome.daily.secondary_button"
-            >
-              ⭐ Daily
-            </button>
-          </div>
-        </div>
-
-        <p className="text-xs mt-4" style={{ color: "#4a6278" }}>
-          © {new Date().getFullYear()}. Built with ❤️ using{" "}
-          <a
-            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "#5288c1" }}
-          >
-            caffeine.ai
-          </a>
-        </p>
-      </motion.div>
     </div>
   );
 }

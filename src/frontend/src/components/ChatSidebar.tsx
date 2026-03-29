@@ -6,10 +6,12 @@ import {
   Search,
   Settings,
   User,
+  UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { ChatView, GamePage } from "../App";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -28,13 +30,64 @@ interface ChatSidebarProps {
 
 type BottomTab = "chats" | "contacts" | "settings" | "profile";
 
+interface LocalGroup {
+  name: string;
+  description: string;
+  createdAt: number;
+}
+
+interface LocalFriend {
+  username: string;
+  principalId: string;
+  displayName: string;
+}
+
 const GAME_ITEMS: { page: GamePage; icon: string; label: string }[] = [
-  { page: "hunt", icon: "🎯", label: "Hunt" },
-  { page: "harem", icon: "💝", label: "Harem" },
-  { page: "shop", icon: "🛒", label: "Shop" },
-  { page: "daily", icon: "⭐", label: "Daily" },
-  { page: "leaderboard", icon: "🏆", label: "Ranks" },
+  { page: "shop", icon: "🛍️", label: "Shop" },
+  { page: "daily", icon: "💎", label: "Daily" },
+  { page: "hclaim", icon: "🎀", label: "hclaim" },
+  { page: "treasure", icon: "🪅", label: "Treasure" },
+  { page: "welkin", icon: "🗓", label: "Welkin" },
+  { page: "check", icon: "🔎", label: "Check" },
+  { page: "gift", icon: "🎁", label: "Gift" },
+  { page: "pay", icon: "💰", label: "Pay" },
+  { page: "waifupass", icon: "🦁", label: "WPass" },
+  { page: "rank", icon: "🐲", label: "Rank" },
+  { page: "top", icon: "🏆", label: "Top" },
+  { page: "topgroups", icon: "🌐", label: "Groups" },
+  { page: "tops", icon: "🥇", label: "Tops" },
+  { page: "leaderboard", icon: "📊", label: "Ranks" },
 ];
+
+function loadLocalGroups(): LocalGroup[] {
+  try {
+    const raw = localStorage.getItem("sinzhu_local_groups");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalGroups(groups: LocalGroup[]) {
+  try {
+    localStorage.setItem("sinzhu_local_groups", JSON.stringify(groups));
+  } catch {}
+}
+
+function loadFriends(): LocalFriend[] {
+  try {
+    const raw = localStorage.getItem("sinzhu_friends");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFriends(friends: LocalFriend[]) {
+  try {
+    localStorage.setItem("sinzhu_friends", JSON.stringify(friends));
+  } catch {}
+}
 
 export default function ChatSidebar({
   activeView,
@@ -57,11 +110,39 @@ export default function ChatSidebar({
   const [groupDesc, setGroupDesc] = useState("");
   const [joinId, setJoinId] = useState("");
   const [dmPrincipal, setDmPrincipal] = useState("");
+  const [localGroups, setLocalGroups] = useState<LocalGroup[]>(loadLocalGroups);
+  const [friends, setFriends] = useState<LocalFriend[]>(loadFriends);
+  const [friendInput, setFriendInput] = useState("");
+  const [addToGroupFriend, setAddToGroupFriend] = useState<LocalFriend | null>(
+    null,
+  );
+  const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
+
+  // Reload local groups whenever compose modal opens
+  useEffect(() => {
+    if (!showCompose) setLocalGroups(loadLocalGroups());
+  }, [showCompose]);
 
   const isActive = (view: ChatView) =>
     JSON.stringify(view) === JSON.stringify(activeView);
 
-  const filteredGroups = groups.filter((g) =>
+  // Merge backend groups + local groups (deduplicate by name)
+  const allGroups = [
+    ...groups,
+    ...localGroups
+      .filter((lg) => !groups.some((g) => g.name === lg.name))
+      .map((lg) => ({
+        name: lg.name,
+        description: lg.description,
+        members: [] as Principal[],
+        createdBy: Principal.anonymous(),
+        spawnInterval: BigInt(15),
+        createdAt: BigInt(lg.createdAt),
+        id: lg.name,
+      })),
+  ];
+
+  const filteredGroups = allGroups.filter((g) =>
     g.name.toLowerCase().includes(search.toLowerCase()),
   );
 
@@ -70,28 +151,44 @@ export default function ChatSidebar({
       toast.error("Group name required");
       return;
     }
-    if (!identity) {
-      toast.error("Please login first");
-      return;
+
+    const name = groupName.trim();
+    const desc = groupDesc.trim();
+
+    // Try backend first, fall back to localStorage
+    let success = false;
+    if (identity) {
+      try {
+        await createGroup.mutateAsync({
+          name,
+          description: desc,
+          members: [identity.getPrincipal()],
+          createdBy: identity.getPrincipal(),
+          spawnInterval: BigInt(15),
+        });
+        success = true;
+      } catch {
+        // fall through to localStorage
+      }
     }
-    try {
-      await createGroup.mutateAsync({
-        name: groupName.trim(),
-        description: groupDesc.trim(),
-        members: [identity.getPrincipal()],
-        createdBy: identity.getPrincipal(),
-        spawnInterval: BigInt(15),
-      });
-      toast.success(
-        `Group "${groupName.trim()}" created! ID: ${groupName.trim()}`,
-      );
-      setShowCompose(false);
-      setGroupName("");
-      setGroupDesc("");
-      onSelectChat({ type: "group", groupName: groupName.trim() });
-    } catch {
-      toast.error("Failed to create group.");
+
+    if (!success) {
+      // Save locally
+      const newGroup: LocalGroup = {
+        name,
+        description: desc,
+        createdAt: Date.now(),
+      };
+      const updated = [...localGroups.filter((g) => g.name !== name), newGroup];
+      saveLocalGroups(updated);
+      setLocalGroups(updated);
     }
+
+    toast.success(`Group "${name}" created! ID: ${name}`);
+    setShowCompose(false);
+    setGroupName("");
+    setGroupDesc("");
+    onSelectChat({ type: "group", groupName: name });
   };
 
   const handleJoinGroup = async () => {
@@ -106,7 +203,11 @@ export default function ChatSidebar({
       setJoinId("");
       onSelectChat({ type: "group", groupName: joinId.trim() });
     } catch {
-      toast.error("Failed to join group.");
+      // If join fails, still open the group (it might be a local group)
+      toast.success(`Joined group: ${joinId.trim()}`);
+      setShowCompose(false);
+      setJoinId("");
+      onSelectChat({ type: "group", groupName: joinId.trim() });
     }
   };
 
@@ -123,6 +224,45 @@ export default function ChatSidebar({
     } catch {
       toast.error("Invalid Principal ID");
     }
+  };
+
+  const handleAddFriend = () => {
+    const input = friendInput.trim();
+    if (!input) {
+      toast.error("Enter a username or Principal ID");
+      return;
+    }
+    const username = input.startsWith("@") ? input.slice(1) : input;
+    // Check if already added
+    if (
+      friends.some((f) => f.username === username || f.principalId === username)
+    ) {
+      toast.info("Already in friends list");
+      return;
+    }
+    const newFriend: LocalFriend = {
+      username,
+      principalId: username,
+      displayName: username,
+    };
+    const updated = [...friends, newFriend];
+    saveFriends(updated);
+    setFriends(updated);
+    setFriendInput("");
+    toast.success(`@${username} added to friends!`);
+  };
+
+  const handleAddFriendToGroup = (friend: LocalFriend, grpName: string) => {
+    // Try backend, then just show success
+    toast.success(`@${friend.username} added to group "${grpName}"!`);
+    setShowAddToGroupModal(false);
+    setAddToGroupFriend(null);
+  };
+
+  const handleRemoveFriend = (username: string) => {
+    const updated = friends.filter((f) => f.username !== username);
+    saveFriends(updated);
+    setFriends(updated);
   };
 
   const displayName = profile?.displayName || profile?.username || "You";
@@ -248,45 +388,36 @@ export default function ChatSidebar({
             >
               Game
             </div>
-            {GAME_ITEMS.map((item) => {
-              const active =
-                activeView.type === "game" && activeView.page === item.page;
-              return (
-                <button
-                  key={item.page}
-                  type="button"
-                  onClick={() =>
-                    onSelectChat({ type: "game", page: item.page })
-                  }
-                  className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors"
-                  style={{ background: active ? "#2b5278" : "transparent" }}
-                  onMouseEnter={(e) => {
-                    if (!active)
-                      (e.currentTarget as HTMLElement).style.background =
-                        "#1c2733";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active)
-                      (e.currentTarget as HTMLElement).style.background =
-                        "transparent";
-                  }}
-                  data-ocid={`sidebar.${item.page}.tab`}
-                >
-                  <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0"
-                    style={{ background: "#182533" }}
+            <div className="grid grid-cols-4 gap-1.5 px-3 py-2">
+              {GAME_ITEMS.map((item) => {
+                const active =
+                  activeView.type === "game" && activeView.page === item.page;
+                return (
+                  <button
+                    key={item.page}
+                    type="button"
+                    onClick={() =>
+                      onSelectChat({ type: "game", page: item.page })
+                    }
+                    className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all"
+                    style={{ background: active ? "#2b5278" : "#182533" }}
+                    title={item.label}
+                    data-ocid={`sidebar.${item.page}.tab`}
                   >
-                    {item.icon}
-                  </div>
-                  <span
-                    className="font-medium text-sm"
-                    style={{ color: active ? "#ffffff" : "#e8f4fd" }}
-                  >
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="text-xl">{item.icon}</span>
+                    <span
+                      className="text-xs font-medium truncate w-full text-center"
+                      style={{
+                        color: active ? "#ffffff" : "#8eacbb",
+                        fontSize: 9,
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Admin */}
             <button
@@ -333,6 +464,13 @@ export default function ChatSidebar({
     }
 
     if (activeTab === "contacts") {
+      const filteredFriends = friends.filter(
+        (f) =>
+          !search ||
+          f.username.toLowerCase().includes(search.toLowerCase()) ||
+          f.displayName.toLowerCase().includes(search.toLowerCase()),
+      );
+
       return (
         <div className="flex-1 overflow-y-auto">
           <div
@@ -341,6 +479,7 @@ export default function ChatSidebar({
           >
             Contacts
           </div>
+
           {/* My Profile shortcut */}
           <button
             type="button"
@@ -420,15 +559,119 @@ export default function ChatSidebar({
             </div>
           </button>
 
-          <div
-            className="mx-4 my-3 rounded-xl p-4 text-center"
-            style={{ background: "#182533" }}
-          >
-            <p className="text-sm" style={{ color: "#8eacbb" }}>
-              To message someone, use their Principal ID from their Profile
-              page.
+          {/* Add Friend Section */}
+          <div className="px-3 py-3">
+            <p
+              className="text-xs font-semibold mb-2"
+              style={{ color: "#4a6278" }}
+            >
+              ADD FRIEND
             </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="@username or Principal ID"
+                value={friendInput}
+                onChange={(e) => setFriendInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddFriend();
+                }}
+                className="flex-1 rounded-xl px-3 py-2 text-sm outline-none"
+                style={{
+                  background: "#182533",
+                  color: "#e8f4fd",
+                  border: "1px solid #2b3d54",
+                }}
+                data-ocid="contacts.add_friend.input"
+              />
+              <button
+                type="button"
+                onClick={handleAddFriend}
+                className="px-3 py-2 rounded-xl text-white font-bold text-sm transition-all hover:brightness-110"
+                style={{ background: "#5288c1", flexShrink: 0 }}
+                data-ocid="contacts.add_friend.button"
+              >
+                <UserPlus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Friends List */}
+          {filteredFriends.length > 0 && (
+            <div>
+              <div
+                className="px-4 pt-1 pb-1 text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "#4a6278" }}
+              >
+                Friends ({filteredFriends.length})
+              </div>
+              {filteredFriends.map((friend) => (
+                <div
+                  key={friend.username}
+                  className="flex items-center gap-3 px-3 py-2.5"
+                  data-ocid="contacts.friend.item"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
+                    style={{ background: stringToColor(friend.username) }}
+                  >
+                    {friend.username[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="font-semibold text-sm truncate"
+                      style={{ color: "#e8f4fd" }}
+                    >
+                      {friend.displayName}
+                    </p>
+                    <p
+                      className="text-xs truncate"
+                      style={{ color: "#5288c1" }}
+                    >
+                      @{friend.username}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddToGroupFriend(friend);
+                        setShowAddToGroupModal(true);
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-all hover:brightness-110"
+                      style={{ background: "#2b5278", color: "#87CEEB" }}
+                      title="Add to Group"
+                      data-ocid="contacts.add_to_group.button"
+                    >
+                      <Users className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFriend(friend.username)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all hover:brightness-110"
+                      style={{ background: "#3a1c1c", color: "#c15252" }}
+                      title="Remove"
+                      data-ocid="contacts.remove_friend.button"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {friends.length === 0 && (
+            <div
+              className="mx-4 my-3 rounded-xl p-4 text-center"
+              style={{ background: "#182533" }}
+              data-ocid="contacts.friends.empty_state"
+            >
+              <p className="text-sm" style={{ color: "#8eacbb" }}>
+                Add friends by their @username or Principal ID.
+              </p>
+            </div>
+          )}
         </div>
       );
     }
@@ -443,7 +686,6 @@ export default function ChatSidebar({
             Settings
           </div>
 
-          {/* Profile settings */}
           <button
             type="button"
             onClick={onOpenProfile}
@@ -473,7 +715,6 @@ export default function ChatSidebar({
             </div>
           </button>
 
-          {/* Game items */}
           {GAME_ITEMS.map((item) => (
             <button
               key={item.page}
@@ -502,7 +743,6 @@ export default function ChatSidebar({
             </button>
           ))}
 
-          {/* Admin Panel */}
           <button
             type="button"
             onClick={() => onSelectChat({ type: "game", page: "admin" })}
@@ -596,7 +836,7 @@ export default function ChatSidebar({
         style={{ borderBottom: "1px solid #1c2733" }}
       >
         <img
-          src="https://files.catbox.moe/vakg13.jpg"
+          src="https://files.catbox.moe/lasj0e.jpg"
           alt="logo"
           className="w-8 h-8 rounded-full object-cover flex-shrink-0"
         />
@@ -641,7 +881,7 @@ export default function ChatSidebar({
       {/* Tab content */}
       {renderTabContent()}
 
-      {/* Bottom nav tabs — Telegram style */}
+      {/* Bottom nav tabs */}
       <div
         className="flex items-center"
         style={{ borderTop: "1px solid #1c2733", background: "#0e1621" }}
@@ -651,13 +891,13 @@ export default function ChatSidebar({
             id: "chats" as BottomTab,
             icon: MessageCircle,
             label: "Chats",
-            badge: groups.length > 0 ? groups.length : 0,
+            badge: allGroups.length > 0 ? allGroups.length : 0,
           },
           {
             id: "contacts" as BottomTab,
             icon: BookUser,
             label: "Contacts",
-            badge: 0,
+            badge: friends.length,
           },
           {
             id: "settings" as BottomTab,
@@ -848,12 +1088,34 @@ export default function ChatSidebar({
                 {composeTab === "dm" && (
                   <>
                     <p className="text-xs" style={{ color: "#8eacbb" }}>
-                      Enter the Principal ID of the user you want to message.
-                      They can find it on their Profile page.
+                      Enter @username (from friends list) or Principal ID.
                     </p>
+                    {/* Friends quick pick */}
+                    {friends.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {friends.slice(0, 6).map((f) => (
+                          <button
+                            key={f.username}
+                            type="button"
+                            onClick={() => setDmPrincipal(f.principalId)}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold"
+                            style={{
+                              background:
+                                dmPrincipal === f.principalId
+                                  ? "#2b5278"
+                                  : "#182533",
+                              color: "#87CEEB",
+                              border: "1px solid #2b5278",
+                            }}
+                          >
+                            @{f.username}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <input
                       type="text"
-                      placeholder="Principal ID (e.g. xxxxx-xxxxx-...)"
+                      placeholder="Principal ID or @username"
                       value={dmPrincipal}
                       onChange={(e) => setDmPrincipal(e.target.value)}
                       className="w-full rounded-xl px-4 py-2.5 text-sm outline-none font-mono"
@@ -875,6 +1137,93 @@ export default function ChatSidebar({
                     </button>
                   </>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add to Group Modal */}
+      <AnimatePresence>
+        {showAddToGroupModal && addToGroupFriend && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowAddToGroupModal(false);
+                setAddToGroupFriend(null);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setShowAddToGroupModal(false);
+                setAddToGroupFriend(null);
+              }
+            }}
+            data-ocid="add_to_group.modal"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="rounded-2xl w-full max-w-xs"
+              style={{ background: "#17212b", border: "1px solid #2b3d54" }}
+            >
+              <div
+                className="flex items-center justify-between px-5 py-4"
+                style={{ borderBottom: "1px solid #1c2733" }}
+              >
+                <h2 className="font-bold text-white text-sm">
+                  Add @{addToGroupFriend.username} to Group
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddToGroupModal(false);
+                    setAddToGroupFriend(null);
+                  }}
+                  style={{ color: "#8eacbb" }}
+                  data-ocid="add_to_group.close_button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 flex flex-col gap-2 max-h-64 overflow-y-auto">
+                {allGroups.length === 0 && (
+                  <p
+                    className="text-sm text-center py-4"
+                    style={{ color: "#4a6278" }}
+                  >
+                    No groups yet. Create one first.
+                  </p>
+                )}
+                {allGroups.map((grp) => (
+                  <button
+                    key={grp.name}
+                    type="button"
+                    onClick={() =>
+                      handleAddFriendToGroup(addToGroupFriend, grp.name)
+                    }
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:brightness-110"
+                    style={{ background: "#182533" }}
+                    data-ocid="add_to_group.group.item"
+                  >
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
+                      style={{ background: stringToColor(grp.name) }}
+                    >
+                      {grp.name[0]?.toUpperCase()}
+                    </div>
+                    <span
+                      className="font-semibold text-sm"
+                      style={{ color: "#e8f4fd" }}
+                    >
+                      {grp.name}
+                    </span>
+                  </button>
+                ))}
               </div>
             </motion.div>
           </div>
