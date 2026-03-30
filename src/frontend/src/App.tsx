@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ChatSidebar from "./components/ChatSidebar";
 import ChatWindow from "./components/ChatWindow";
 import GoogleLoginModal from "./components/GoogleLoginModal";
@@ -54,6 +54,77 @@ export type ChatView =
   | { type: "profile" };
 
 type AnyPage = string;
+
+function FreefireLoadingScreen({ onDone }: { onDone: () => void }) {
+  const [progress, setProgress] = useState(0);
+  const [done, setDone] = useState(false);
+
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    let start: number | null = null;
+    let rafId: number;
+    const duration = 2500;
+    const step = (ts: number) => {
+      if (!start) start = ts;
+      const elapsed = ts - start;
+      const pct = Math.min((elapsed / duration) * 100, 100);
+      setProgress(pct);
+      if (pct < 100) {
+        rafId = requestAnimationFrame(step);
+      } else {
+        setTimeout(() => {
+          setDone(true);
+          setTimeout(() => onDoneRef.current(), 450);
+        }, 200);
+      }
+    };
+    rafId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+      style={{ background: "#0a0a0a" }}
+      animate={done ? { x: "100%" } : { x: 0 }}
+      transition={{ duration: 0.4, ease: "easeIn" }}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <img
+          src="https://files.catbox.moe/lasj0e.jpg"
+          alt="SinzhuWaifu"
+          className="w-[200px] h-[200px] rounded-full object-cover shadow-2xl"
+          style={{ border: "3px solid #ff8c00" }}
+        />
+        <p className="text-white text-2xl font-extrabold tracking-widest mt-2">
+          SinzhuWaifu
+        </p>
+        <p className="text-xs" style={{ color: "#888" }}>
+          Loading your world...
+        </p>
+      </div>
+      <div className="absolute bottom-12 left-0 right-0 px-8">
+        <div
+          className="w-full h-1.5 rounded-full"
+          style={{ background: "#1a1a1a" }}
+        >
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${progress}%`,
+              background: "linear-gradient(90deg, #ff6600, #ffcc00)",
+            }}
+          />
+        </div>
+        <p className="text-xs text-center mt-2" style={{ color: "#666" }}>
+          {Math.round(progress)}%
+        </p>
+      </div>
+    </motion.div>
+  );
+}
 
 function LoadingScreen() {
   return (
@@ -210,10 +281,28 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(() => {
+    if (sessionStorage.getItem("sinzhu_splash_shown")) return false;
+    return true;
+  });
+
+  const handleSplashDone = () => {
+    sessionStorage.setItem("sinzhu_splash_shown", "true");
+    setShowSplash(false);
+  };
   const { identity, isInitializing, login } = useInternetIdentity();
   const googleAuth = useGoogleAuth();
   const [activeView, setActiveView] = useState<ChatView>({ type: "welcome" });
   const [showSidebar, setShowSidebar] = useState(true);
+
+  // Splash screen
+  if (showSplash) {
+    return (
+      <AnimatePresence>
+        <FreefireLoadingScreen onDone={handleSplashDone} />
+      </AnimatePresence>
+    );
+  }
 
   // Auth gate
   if (isInitializing) {
@@ -288,7 +377,7 @@ export default function App() {
         case "admin":
           return (
             <div className={wrapperClass}>
-              <Admin />
+              <Admin onNavigate={nav} />
             </div>
           );
         case "waifupass":

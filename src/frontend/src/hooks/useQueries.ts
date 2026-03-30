@@ -21,10 +21,26 @@ export function useWaifuCharacters() {
   return useQuery<WaifuCharacter[]>({
     queryKey: ["waifuCharacters"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getWaifuCharacters();
+      const lsRaw = localStorage.getItem("sinzhu_waifus");
+      const lsWaifus: WaifuCharacter[] = lsRaw ? JSON.parse(lsRaw) : [];
+      if (!actor) return lsWaifus;
+      let backendWaifus: WaifuCharacter[] = [];
+      try {
+        backendWaifus = await actor.getWaifuCharacters();
+      } catch {
+        // fallback to localStorage only
+      }
+      // Merge deduplicated by id
+      const merged = [...backendWaifus];
+      for (const lsW of lsWaifus) {
+        if (!merged.find((w) => w.id === lsW.id)) {
+          merged.push(lsW);
+        }
+      }
+      return merged;
     },
     enabled: !!actor && !isFetching,
+    refetchInterval: 5000,
   });
 }
 

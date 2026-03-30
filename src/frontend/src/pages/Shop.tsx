@@ -1,8 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Coins, ShoppingCart } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Coins,
+  ShoppingCart,
+  Upload,
+} from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { ShopItem } from "../backend";
 import { ITEM_TYPE_ICONS, SEED_SHOP_ITEMS } from "../data/seedData";
@@ -63,12 +70,145 @@ export default function Shop({ onNavigate }: ShopProps) {
     cosmetic: "oklch(0.72 0.18 160)",
   };
 
+  const isAdmin = localStorage.getItem("sinzhu_admin_unlocked") === "true";
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    name: "",
+    imageUrl: "",
+    price: "",
+    rarity: "common",
+  });
+
+  const handleWaifuUpload = () => {
+    if (!uploadForm.name || !uploadForm.imageUrl) {
+      toast.error("Name and Photo URL are required!");
+      return;
+    }
+    const newWaifu = {
+      id: `waifu-${Date.now()}`,
+      name: uploadForm.name,
+      series: "Unknown",
+      rarity: uploadForm.rarity,
+      imageUrl: uploadForm.imageUrl,
+    };
+    const existing = JSON.parse(localStorage.getItem("sinzhu_waifus") || "[]");
+    existing.push(newWaifu);
+    localStorage.setItem("sinzhu_waifus", JSON.stringify(existing));
+    toast.success(`Waifu "${uploadForm.name}" uploaded! ✅`);
+    setUploadForm({ name: "", imageUrl: "", price: "", rarity: "common" });
+    setShowUpload(false);
+  };
+
   return (
     <main className="max-w-5xl mx-auto px-4 py-8" data-ocid="shop.section">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
+        {isAdmin && (
+          <div
+            className="mb-6 rounded-2xl overflow-hidden"
+            style={{ border: "1px solid oklch(0.75 0.22 330 / 0.3)" }}
+          >
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold"
+              style={{
+                background: "oklch(0.75 0.22 330 / 0.1)",
+                color: "oklch(0.85 0.18 330)",
+              }}
+              onClick={() => setShowUpload((v) => !v)}
+              data-ocid="shop.upload_waifu.toggle"
+            >
+              <span>🎴 Upload Waifu (Admin)</span>
+              {showUpload ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
+            {showUpload && (
+              <div
+                className="px-5 py-4 flex flex-col gap-3"
+                style={{ background: "oklch(0.12 0.02 290)" }}
+              >
+                <input
+                  type="text"
+                  placeholder="Character Name *"
+                  value={uploadForm.name}
+                  onChange={(e) =>
+                    setUploadForm((p) => ({ ...p, name: e.target.value }))
+                  }
+                  className="rounded-xl px-4 py-2 text-sm outline-none w-full"
+                  style={{
+                    background: "#182533",
+                    color: "#e8f4fd",
+                    border: "1px solid #2b3d54",
+                  }}
+                  data-ocid="shop.waifu_name.input"
+                />
+                <input
+                  type="text"
+                  placeholder="Photo URL *"
+                  value={uploadForm.imageUrl}
+                  onChange={(e) =>
+                    setUploadForm((p) => ({ ...p, imageUrl: e.target.value }))
+                  }
+                  className="rounded-xl px-4 py-2 text-sm outline-none w-full"
+                  style={{
+                    background: "#182533",
+                    color: "#e8f4fd",
+                    border: "1px solid #2b3d54",
+                  }}
+                  data-ocid="shop.waifu_url.input"
+                />
+                <input
+                  type="number"
+                  placeholder="Price in Onex"
+                  value={uploadForm.price}
+                  onChange={(e) =>
+                    setUploadForm((p) => ({ ...p, price: e.target.value }))
+                  }
+                  className="rounded-xl px-4 py-2 text-sm outline-none w-full"
+                  style={{
+                    background: "#182533",
+                    color: "#e8f4fd",
+                    border: "1px solid #2b3d54",
+                  }}
+                  data-ocid="shop.waifu_price.input"
+                />
+                <select
+                  value={uploadForm.rarity}
+                  onChange={(e) =>
+                    setUploadForm((p) => ({ ...p, rarity: e.target.value }))
+                  }
+                  className="rounded-xl px-4 py-2 text-sm outline-none w-full"
+                  style={{
+                    background: "#182533",
+                    color: "#e8f4fd",
+                    border: "1px solid #2b3d54",
+                  }}
+                  data-ocid="shop.waifu_rarity.select"
+                >
+                  <option value="common">🟢 Common</option>
+                  <option value="rare">🔵 Rare</option>
+                  <option value="epic">🟣 Epic</option>
+                  <option value="legendary">🟡 Legendary</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleWaifuUpload}
+                  className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold"
+                  style={{ background: "oklch(0.75 0.22 330)", color: "#fff" }}
+                  data-ocid="shop.waifu_upload.button"
+                >
+                  <Upload className="w-4 h-4" /> Upload Waifu
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1

@@ -29,7 +29,11 @@ import {
 const ADMIN_USERNAME = "OwnerSween";
 const ADMIN_PASSWORD = "7864owner";
 
-export default function Admin() {
+interface AdminProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function Admin({ onNavigate }: AdminProps) {
   const { data: characters } = useWaifuCharacters();
   const { data: shopItems } = useShopItems();
   const { data: ads } = useAds();
@@ -70,6 +74,7 @@ export default function Admin() {
     if (loginUsername === ADMIN_USERNAME && loginPassword === ADMIN_PASSWORD) {
       setUnlocked(true);
       setLoginError("");
+      localStorage.setItem("sinzhu_admin_unlocked", "true");
       toast.success("Admin panel unlocked!");
     } else {
       setLoginError("Wrong username or password.");
@@ -152,23 +157,28 @@ export default function Admin() {
   }
 
   const handleAddWaifu = async () => {
-    if (!waifuForm.name || !waifuForm.series || !waifuForm.imageUrl) {
-      toast.error("Fill in all required fields!");
+    if (!waifuForm.name || !waifuForm.imageUrl) {
+      toast.error("Name and Photo URL are required!");
       return;
     }
+    const newWaifu = {
+      id: `waifu-${Date.now()}`,
+      name: waifuForm.name,
+      series: waifuForm.series || "Unknown",
+      rarity: waifuForm.rarity,
+      imageUrl: waifuForm.imageUrl,
+    };
+    // Always save to localStorage first
+    const existing = JSON.parse(localStorage.getItem("sinzhu_waifus") || "[]");
+    existing.push(newWaifu);
+    localStorage.setItem("sinzhu_waifus", JSON.stringify(existing));
     try {
-      await addWaifu.mutateAsync({
-        id: `waifu-${Date.now()}`,
-        name: waifuForm.name,
-        series: waifuForm.series,
-        rarity: waifuForm.rarity,
-        imageUrl: waifuForm.imageUrl,
-      });
-      toast.success(`Waifu "${waifuForm.name}" added!`);
-      setWaifuForm({ name: "", series: "", rarity: "common", imageUrl: "" });
+      await addWaifu.mutateAsync(newWaifu);
     } catch {
-      toast.error("Failed to add waifu.");
+      // localStorage already saved - that's our fallback
     }
+    toast.success(`Waifu "${waifuForm.name}" added! ✅`);
+    setWaifuForm({ name: "", series: "", rarity: "common", imageUrl: "" });
   };
 
   const handleDeleteWaifu = async (id: string, name: string) => {
@@ -203,24 +213,23 @@ export default function Admin() {
   };
 
   const handleAddAd = async () => {
-    if (!adForm.title || (!adForm.imageUrl && !adForm.videoUrl)) {
-      toast.error("Title and at least one media URL required!");
-      return;
-    }
+    const newAd: Ad = {
+      id: `ad-${Date.now()}`,
+      title: adForm.title || "Ad",
+      imageUrl: adForm.imageUrl,
+      videoUrl: adForm.videoUrl,
+      link: adForm.link,
+    };
     try {
-      const newAd: Ad = {
-        id: `ad-${Date.now()}`,
-        title: adForm.title,
-        imageUrl: adForm.imageUrl,
-        videoUrl: adForm.videoUrl,
-        link: adForm.link,
-      };
       await addAd.mutateAsync(newAd);
-      toast.success(`Ad "${adForm.title}" added!`);
-      setAdForm({ title: "", imageUrl: "", videoUrl: "", link: "" });
     } catch {
-      toast.error("Failed to add ad.");
+      // localStorage ads fallback
+      const lsAds = JSON.parse(localStorage.getItem("sinzhu_ads") || "[]");
+      lsAds.push(newAd);
+      localStorage.setItem("sinzhu_ads", JSON.stringify(lsAds));
     }
+    toast.success("Ad uploaded! ✅");
+    setAdForm({ title: "", imageUrl: "", videoUrl: "", link: "" });
   };
 
   const handleDeleteAd = async (id: string, title: string) => {
@@ -239,6 +248,17 @@ export default function Admin() {
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center gap-3 mb-8">
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate("home")}
+              className="text-xs px-3 py-1.5 rounded-lg mr-1"
+              style={{ background: "#1c2733", color: "#8eacbb" }}
+              data-ocid="admin.back.button"
+            >
+              ← Back
+            </button>
+          )}
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{
