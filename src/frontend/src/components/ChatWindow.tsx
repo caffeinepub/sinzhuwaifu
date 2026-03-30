@@ -3282,6 +3282,99 @@ export default function ChatWindow({
   );
 }
 
+function VoiceMessagePlayer({ src }: { src?: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      audio.play();
+      setPlaying(true);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 py-1 min-w-[180px]">
+      <audio
+        ref={audioRef}
+        src={src}
+        onTimeUpdate={() => {
+          const a = audioRef.current;
+          if (a) {
+            setCurrentTime(a.currentTime);
+            setProgress(a.duration ? (a.currentTime / a.duration) * 100 : 0);
+          }
+        }}
+        onLoadedMetadata={() => {
+          if (audioRef.current) setDuration(audioRef.current.duration);
+        }}
+        onEnded={() => setPlaying(false)}
+      >
+        <track kind="captions" />
+      </audio>
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "#5288c1" }}
+      >
+        <span className="text-white text-xs">{playing ? "⏸" : "▶"}</span>
+      </button>
+      <div className="flex-1 flex flex-col gap-1">
+        <div
+          className="w-full h-1.5 rounded-full cursor-pointer"
+          style={{ background: "#1e3a4a" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const rect = (e.target as HTMLElement).getBoundingClientRect();
+            const pct = (e.clientX - rect.left) / rect.width;
+            if (audioRef.current)
+              audioRef.current.currentTime =
+                pct * (audioRef.current.duration || 0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight" && audioRef.current)
+              audioRef.current.currentTime = Math.min(
+                audioRef.current.duration || 0,
+                audioRef.current.currentTime + 5,
+              );
+            if (e.key === "ArrowLeft" && audioRef.current)
+              audioRef.current.currentTime = Math.max(
+                0,
+                audioRef.current.currentTime - 5,
+              );
+          }}
+          role="slider"
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          tabIndex={0}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${progress}%`, background: "#87CEEB" }}
+          />
+        </div>
+        <span className="text-xs" style={{ color: "#87CEEB" }}>
+          {fmt(currentTime)} / {fmt(duration)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function BotMessageBubble({
   message,
   isWaifuSpawnCard,
@@ -3365,16 +3458,7 @@ function BotMessageBubble({
             </video>
           )}
           {message.mediaType === "voice" ? (
-            <div className="flex items-center gap-2 py-1">
-              <span className="text-lg">🎤</span>
-              <div
-                className="flex-1 h-1 rounded-full"
-                style={{ background: "#87CEEB", opacity: 0.5 }}
-              />
-              <span className="text-xs" style={{ color: "#87CEEB" }}>
-                Voice
-              </span>
-            </div>
+            <VoiceMessagePlayer key={message.id} src={message.mediaUrl} />
           ) : isEditing ? (
             <input
               className="text-sm w-full rounded px-2 py-1 outline-none"
@@ -3430,7 +3514,7 @@ function BotMessageBubble({
       <div className="flex items-start gap-2 max-w-xs md:max-w-sm lg:max-w-md">
         <div className="w-8 h-8 rounded-full flex-shrink-0 mt-0.5 overflow-hidden">
           <img
-            src="https://files.catbox.moe/vakg13.jpg"
+            src="https://files.catbox.moe/lasj0e.jpg"
             alt="bot"
             className="w-full h-full object-cover"
           />
