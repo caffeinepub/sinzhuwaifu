@@ -105,6 +105,16 @@ export default function Shop({ onNavigate }: ShopProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
+        <button
+          type="button"
+          onClick={() => onNavigate("home")}
+          className="flex items-center gap-1 text-sm mb-4 transition-colors hover:text-white"
+          style={{ color: "oklch(0.72 0.04 290)" }}
+          data-ocid="shop.back.button"
+        >
+          ← Back
+        </button>
+
         {isAdmin && (
           <div
             className="mb-6 rounded-2xl overflow-hidden"

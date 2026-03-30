@@ -43,6 +43,262 @@ interface LocalFriend {
   displayName: string;
 }
 
+interface FakeGroup {
+  name: string;
+  lastMessage: string;
+  lastTime: string;
+  unread: number;
+  memberCount: string;
+  online: boolean;
+  emoji: string;
+}
+
+interface FakeDM {
+  username: string;
+  avatar: string;
+  lastMessage: string;
+  lastTime: string;
+  unread: number;
+  online: boolean;
+}
+
+const FAKE_GROUPS: FakeGroup[] = [
+  {
+    name: "🌸 Anime Squad",
+    lastMessage: "bhai new waifu ayi! 😍",
+    lastTime: "2m",
+    unread: 5,
+    memberCount: "1.2k",
+    online: true,
+    emoji: "🌸",
+  },
+  {
+    name: "⚔️ Naruto Fans",
+    lastMessage: "/oon kar yaar bots ko",
+    lastTime: "Just now",
+    unread: 12,
+    memberCount: "876",
+    online: true,
+    emoji: "⚔️",
+  },
+  {
+    name: "🎮 Waifu Hunters",
+    lastMessage: "legendary waifu mili 🎉",
+    lastTime: "5m",
+    unread: 3,
+    memberCount: "567",
+    online: true,
+    emoji: "🎮",
+  },
+  {
+    name: "🔥 One Piece Crew",
+    lastMessage: "next hunt kab? ready hun",
+    lastTime: "8m",
+    unread: 0,
+    memberCount: "2.3k",
+    online: false,
+    emoji: "🔥",
+  },
+  {
+    name: "🌙 Night Owls",
+    lastMessage: "koi hai? chat karo yaar",
+    lastTime: "12m",
+    unread: 7,
+    memberCount: "234",
+    online: true,
+    emoji: "🌙",
+  },
+  {
+    name: "🎴 SealWaifu Official",
+    lastMessage: "Admin: new waifus uploaded!",
+    lastTime: "15m",
+    unread: 20,
+    memberCount: "5.1k",
+    online: true,
+    emoji: "🎴",
+  },
+  {
+    name: "💫 Attack on Titan",
+    lastMessage: "Eren ki waifu sab se best hai",
+    lastTime: "22m",
+    unread: 0,
+    memberCount: "1.8k",
+    online: false,
+    emoji: "💫",
+  },
+  {
+    name: "🏯 Demon Slayer",
+    lastMessage: "Nezuko waifu hunt kiya kisne?",
+    lastTime: "30m",
+    unread: 4,
+    memberCount: "945",
+    online: true,
+    emoji: "🏯",
+  },
+  {
+    name: "🌊 Bleach Community",
+    lastMessage: "Rukia vs Orihime fight!",
+    lastTime: "45m",
+    unread: 0,
+    memberCount: "678",
+    online: false,
+    emoji: "🌊",
+  },
+  {
+    name: "✨ My Hero Academia",
+    lastMessage: "Ochako waifu number 1 💖",
+    lastTime: "1h",
+    unread: 8,
+    memberCount: "1.4k",
+    online: true,
+    emoji: "✨",
+  },
+  {
+    name: "🐉 Dragon Ball Z",
+    lastMessage: "Android 18 best waifu fight me",
+    lastTime: "1h",
+    unread: 0,
+    memberCount: "3.2k",
+    online: false,
+    emoji: "🐉",
+  },
+  {
+    name: "🌺 Re:Zero Fans",
+    lastMessage: "Rem vs Ram debate chalu hai",
+    lastTime: "2h",
+    unread: 2,
+    memberCount: "789",
+    online: true,
+    emoji: "🌺",
+  },
+  {
+    name: "🗡️ Sword Art Online",
+    lastMessage: "Asuna ki waifu card mili mujhe!",
+    lastTime: "2h",
+    unread: 0,
+    memberCount: "1.1k",
+    online: false,
+    emoji: "🗡️",
+  },
+  {
+    name: "💠 Fairy Tail Guild",
+    lastMessage: "Erza waifu hunter group join karo",
+    lastTime: "3h",
+    unread: 6,
+    memberCount: "456",
+    online: true,
+    emoji: "💠",
+  },
+  {
+    name: "🎆 Hunter x Hunter",
+    lastMessage: "Bisky waifu OP hai yaar",
+    lastTime: "3h",
+    unread: 0,
+    memberCount: "823",
+    online: false,
+    emoji: "🎆",
+  },
+];
+
+const FAKE_DMS: FakeDM[] = [
+  {
+    username: "NarutoFan99",
+    avatar: "🍥",
+    lastMessage: "bhai kya chal raha hai?",
+    lastTime: "1m",
+    unread: 2,
+    online: true,
+  },
+  {
+    username: "SakuraChan",
+    avatar: "🌸",
+    lastMessage: "meri waifu dekh 😍",
+    lastTime: "3m",
+    unread: 0,
+    online: true,
+  },
+  {
+    username: "SasukeSan",
+    avatar: "⚡",
+    lastMessage: "aaj hunt kiya?",
+    lastTime: "8m",
+    unread: 1,
+    online: true,
+  },
+  {
+    username: "WaifuQueen",
+    avatar: "👑",
+    lastMessage: "tera harem kitna bada hai?",
+    lastTime: "15m",
+    unread: 4,
+    online: false,
+  },
+  {
+    username: "AnimeKing",
+    avatar: "🔥",
+    lastMessage: "daily reward liya kya?",
+    lastTime: "20m",
+    unread: 0,
+    online: true,
+  },
+  {
+    username: "HinataLover",
+    avatar: "💙",
+    lastMessage: "kab online hoga?",
+    lastTime: "30m",
+    unread: 3,
+    online: false,
+  },
+  {
+    username: "OnePieceBro",
+    avatar: "🏴‍☠️",
+    lastMessage: "bhai legendary mili mujhe!",
+    lastTime: "45m",
+    unread: 0,
+    online: true,
+  },
+  {
+    username: "LeviAckerman",
+    avatar: "⚔️",
+    lastMessage: "clean sweep karta hun",
+    lastTime: "1h",
+    unread: 0,
+    online: false,
+  },
+  {
+    username: "MikasaFan",
+    avatar: "🗡️",
+    lastMessage: "Mikasa waifu best hai",
+    lastTime: "1h",
+    unread: 5,
+    online: true,
+  },
+  {
+    username: "GaraaSenpai",
+    avatar: "🏜️",
+    lastMessage: "sand waifu bhi upload karo",
+    lastTime: "2h",
+    unread: 0,
+    online: false,
+  },
+  {
+    username: "IchigoKurosaki",
+    avatar: "🌙",
+    lastMessage: "Rukia vs Orihime - kon best?",
+    lastTime: "2h",
+    unread: 1,
+    online: true,
+  },
+  {
+    username: "ZeroTwoFan",
+    avatar: "💘",
+    lastMessage: "Zero Two waifu supreme! 💖",
+    lastTime: "3h",
+    unread: 0,
+    online: false,
+  },
+];
+
 const GAME_ITEMS: { page: GamePage; icon: string; label: string }[] = [
   { page: "coupon", icon: "🀄", label: "Coupon" },
   { page: "refer", icon: "💖", label: "Refer" },
@@ -121,7 +377,6 @@ export default function ChatSidebar({
   );
   const [showAddToGroupModal, setShowAddToGroupModal] = useState(false);
 
-  // Reload local groups whenever compose modal opens
   useEffect(() => {
     if (!showCompose) setLocalGroups(loadLocalGroups());
   }, [showCompose]);
@@ -129,7 +384,6 @@ export default function ChatSidebar({
   const isActive = (view: ChatView) =>
     JSON.stringify(view) === JSON.stringify(activeView);
 
-  // Merge backend groups + local groups (deduplicate by name)
   const allGroups = [
     ...groups,
     ...localGroups
@@ -149,6 +403,14 @@ export default function ChatSidebar({
     g.name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const filteredFakeGroups = FAKE_GROUPS.filter(
+    (g) => !search || g.name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const filteredFakeDMs = FAKE_DMS.filter(
+    (d) => !search || d.username.toLowerCase().includes(search.toLowerCase()),
+  );
+
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
       toast.error("Group name required");
@@ -158,7 +420,6 @@ export default function ChatSidebar({
     const name = groupName.trim();
     const desc = groupDesc.trim();
 
-    // Try backend first, fall back to localStorage
     let success = false;
     if (identity) {
       try {
@@ -176,7 +437,6 @@ export default function ChatSidebar({
     }
 
     if (!success) {
-      // Save locally
       const newGroup: LocalGroup = {
         name,
         description: desc,
@@ -206,7 +466,6 @@ export default function ChatSidebar({
       setJoinId("");
       onSelectChat({ type: "group", groupName: joinId.trim() });
     } catch {
-      // If join fails, still open the group (it might be a local group)
       toast.success(`Joined group: ${joinId.trim()}`);
       setShowCompose(false);
       setJoinId("");
@@ -236,7 +495,6 @@ export default function ChatSidebar({
       return;
     }
     const username = input.startsWith("@") ? input.slice(1) : input;
-    // Check if already added
     if (
       friends.some((f) => f.username === username || f.principalId === username)
     ) {
@@ -256,7 +514,6 @@ export default function ChatSidebar({
   };
 
   const handleAddFriendToGroup = (friend: LocalFriend, grpName: string) => {
-    // Try backend, then just show success
     toast.success(`@${friend.username} added to group "${grpName}"!`);
     setShowAddToGroupModal(false);
     setAddToGroupFriend(null);
@@ -275,18 +532,111 @@ export default function ChatSidebar({
     profilePicUrl = profile?.profilePic?.getDirectURL?.() || "";
   } catch {}
 
+  const totalUnread =
+    FAKE_DMS.reduce((s, d) => s + d.unread, 0) +
+    FAKE_GROUPS.reduce((s, g) => s + g.unread, 0);
+
   const renderTabContent = () => {
     if (activeTab === "chats") {
       return (
         <div className="flex-1 overflow-y-auto">
-          {/* Groups */}
+          {/* Fake DMs */}
+          {filteredFakeDMs.length > 0 && (
+            <div>
+              <div
+                className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "#4a6278" }}
+              >
+                Direct Messages
+              </div>
+              {filteredFakeDMs.map((dm) => {
+                const dmView: ChatView = {
+                  type: "dm",
+                  principalStr: `bot-${dm.username}`,
+                };
+                const active = isActive(dmView);
+                return (
+                  <button
+                    key={dm.username}
+                    type="button"
+                    onClick={() => onSelectChat(dmView)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+                    style={{ background: active ? "#2b5278" : "transparent" }}
+                    onMouseEnter={(e) => {
+                      if (!active)
+                        (e.currentTarget as HTMLElement).style.background =
+                          "#1c2733";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active)
+                        (e.currentTarget as HTMLElement).style.background =
+                          "transparent";
+                    }}
+                    data-ocid="sidebar.dm.item"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div
+                        className="w-11 h-11 rounded-full flex items-center justify-center text-xl"
+                        style={{ background: stringToColor(dm.username) }}
+                      >
+                        {dm.avatar}
+                      </div>
+                      {dm.online && (
+                        <span
+                          className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
+                          style={{
+                            background: "#3b9e5a",
+                            borderColor: active ? "#2b5278" : "#0e1621",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="font-semibold text-sm truncate"
+                          style={{ color: "#e8f4fd" }}
+                        >
+                          {dm.username}
+                        </span>
+                        <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                          <span
+                            className="text-xs"
+                            style={{ color: "#4a6278" }}
+                          >
+                            {dm.lastTime}
+                          </span>
+                          {dm.unread > 0 && (
+                            <span
+                              className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+                              style={{ background: "#3b9e5a" }}
+                            >
+                              {dm.unread}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p
+                        className="text-xs truncate"
+                        style={{ color: "#8eacbb" }}
+                      >
+                        {dm.lastMessage}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Real user groups */}
           {filteredGroups.length > 0 && (
             <div>
               <div
                 className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
                 style={{ color: "#4a6278" }}
               >
-                Groups
+                My Groups
               </div>
               {filteredGroups.map((group) => {
                 const active = isActive({
@@ -373,31 +723,134 @@ export default function ChatSidebar({
             </div>
           )}
 
-          {filteredGroups.length === 0 && !search && (
-            <div
-              className="px-4 py-6 text-center"
-              data-ocid="sidebar.groups.empty_state"
-            >
-              <div className="text-3xl mb-2">💬</div>
-              <p className="text-sm" style={{ color: "#4a6278" }}>
-                No groups yet
-              </p>
-              <p className="text-xs mt-1" style={{ color: "#2b3d54" }}>
-                Press + to create one
-              </p>
+          {/* Fake community groups */}
+          {filteredFakeGroups.length > 0 && (
+            <div>
+              <div
+                className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider"
+                style={{ color: "#4a6278" }}
+              >
+                Community Groups
+              </div>
+              {filteredFakeGroups.map((group) => {
+                const fakeView: ChatView = {
+                  type: "group",
+                  groupName: group.name,
+                };
+                const active = isActive(fakeView);
+                return (
+                  <button
+                    key={group.name}
+                    type="button"
+                    onClick={() => onSelectChat(fakeView)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+                    style={{ background: active ? "#2b5278" : "transparent" }}
+                    onMouseEnter={(e) => {
+                      if (!active)
+                        (e.currentTarget as HTMLElement).style.background =
+                          "#1c2733";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active)
+                        (e.currentTarget as HTMLElement).style.background =
+                          "transparent";
+                    }}
+                    data-ocid="sidebar.fake_group.item"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div
+                        className="w-11 h-11 rounded-full flex items-center justify-center text-xl"
+                        style={{ background: stringToColor(group.name) }}
+                      >
+                        {group.emoji}
+                      </div>
+                      {group.online && (
+                        <span
+                          className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
+                          style={{
+                            background: "#3b9e5a",
+                            borderColor: active ? "#2b5278" : "#0e1621",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="font-semibold text-sm truncate"
+                          style={{ color: "#e8f4fd" }}
+                        >
+                          {group.name}
+                        </span>
+                        <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                          <span
+                            className="text-xs"
+                            style={{ color: "#4a6278" }}
+                          >
+                            {group.lastTime}
+                          </span>
+                          {group.unread > 0 && (
+                            <span
+                              className="min-w-[18px] h-[18px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+                              style={{ background: "#5288c1" }}
+                            >
+                              {group.unread}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p
+                          className="text-xs truncate flex-1"
+                          style={{ color: "#8eacbb" }}
+                        >
+                          {group.lastMessage}
+                        </p>
+                        <span
+                          className="text-xs ml-2 flex-shrink-0"
+                          style={{ color: "#4a6278" }}
+                        >
+                          👥 {group.memberCount}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          {filteredGroups.length === 0 && search && (
-            <div
-              className="px-4 py-4 text-center"
-              data-ocid="sidebar.search.empty_state"
-            >
-              <p className="text-sm" style={{ color: "#4a6278" }}>
-                No groups found for "{search}"
-              </p>
-            </div>
-          )}
+          {filteredGroups.length === 0 &&
+            filteredFakeGroups.length === 0 &&
+            filteredFakeDMs.length === 0 &&
+            !search && (
+              <div
+                className="px-4 py-6 text-center"
+                data-ocid="sidebar.groups.empty_state"
+              >
+                <div className="text-3xl mb-2">💬</div>
+                <p className="text-sm" style={{ color: "#4a6278" }}>
+                  No chats yet
+                </p>
+                <p className="text-xs mt-1" style={{ color: "#2b3d54" }}>
+                  Press + to create one
+                </p>
+              </div>
+            )}
+
+          {filteredGroups.length === 0 &&
+            filteredFakeGroups.length === 0 &&
+            filteredFakeDMs.length === 0 &&
+            search && (
+              <div
+                className="px-4 py-4 text-center"
+                data-ocid="sidebar.search.empty_state"
+              >
+                <p className="text-sm" style={{ color: "#4a6278" }}>
+                  No results for "{search}"
+                </p>
+              </div>
+            )}
 
           {/* Game Section */}
           <div className="mt-2">
@@ -499,7 +952,6 @@ export default function ChatSidebar({
             Contacts
           </div>
 
-          {/* My Profile shortcut */}
           <button
             type="button"
             onClick={onOpenProfile}
@@ -545,7 +997,6 @@ export default function ChatSidebar({
             </div>
           </button>
 
-          {/* New DM button */}
           <button
             type="button"
             onClick={() => {
@@ -578,7 +1029,6 @@ export default function ChatSidebar({
             </div>
           </button>
 
-          {/* Add Friend Section */}
           <div className="px-3 py-3">
             <p
               className="text-xs font-semibold mb-2"
@@ -615,7 +1065,6 @@ export default function ChatSidebar({
             </div>
           </div>
 
-          {/* Friends List */}
           {filteredFriends.length > 0 && (
             <div>
               <div
@@ -794,7 +1243,6 @@ export default function ChatSidebar({
       );
     }
 
-    // profile tab
     return (
       <div className="flex-1 overflow-y-auto flex flex-col items-center pt-8 px-4">
         <button
@@ -871,6 +1319,14 @@ export default function ChatSidebar({
         >
           SinzhuWaifu
         </span>
+        {totalUnread > 0 && (
+          <span
+            className="min-w-[20px] h-5 px-1.5 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+            style={{ background: "#e53935" }}
+          >
+            {totalUnread > 99 ? "99+" : totalUnread}
+          </span>
+        )}
       </div>
 
       {/* Search */}
@@ -910,7 +1366,10 @@ export default function ChatSidebar({
             id: "chats" as BottomTab,
             icon: MessageCircle,
             label: "Chats",
-            badge: allGroups.length > 0 ? allGroups.length : 0,
+            badge:
+              allGroups.length +
+              FAKE_GROUPS.length +
+              FAKE_DMS.filter((d) => d.unread > 0).length,
           },
           {
             id: "contacts" as BottomTab,
@@ -1109,7 +1568,6 @@ export default function ChatSidebar({
                     <p className="text-xs" style={{ color: "#8eacbb" }}>
                       Enter @username (from friends list) or Principal ID.
                     </p>
-                    {/* Friends quick pick */}
                     {friends.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {friends.slice(0, 6).map((f) => (
