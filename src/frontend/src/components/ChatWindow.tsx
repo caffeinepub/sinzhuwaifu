@@ -1,12 +1,16 @@
 import { Principal } from "@icp-sdk/core/principal";
 import {
   ArrowLeft,
+  Camera,
   ChevronDown,
   Info,
   Mic,
+  MicOff,
   Paperclip,
   Phone,
+  PhoneOff,
   Send,
+  UserCheck,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -116,8 +120,9 @@ const ALL_COMMANDS = [
   { cmd: "/wpass", desc: "Waifu pass status" },
   { cmd: "/shop", desc: "Open shop" },
   { cmd: "/slavetime [n]", desc: "Set spawn interval (≥15)" },
-  { cmd: "/on", desc: "Activate anime bots party" },
-  { cmd: "/off", desc: "Stop anime bots" },
+  { cmd: "/oon", desc: "Activate anime bots party" },
+  { cmd: "/oof", desc: "Stop anime bots" },
+  { cmd: "/harem", desc: "View your waifu collection" },
   { cmd: "/start", desc: "Show all commands" },
 ];
 
@@ -269,6 +274,1140 @@ const ANIME_BOTS = [
   },
 ];
 
+// 127 always-active members — chat continuously regardless of /on /off
+const ACTIVE_MEMBERS = [
+  {
+    name: "AkatsukiFan",
+    avatar: "🔴",
+    messages: [
+      "Bhai /hunt fast karo!",
+      "Akatsuki gang assemble!",
+      "Waifu collection mein add kar li!",
+    ],
+  },
+  {
+    name: "KonohaHero",
+    avatar: "🍃",
+    messages: [
+      "Yaar kaunsi waifu best hai?",
+      "Main village protect karta hoon aur waifus bhi 😂",
+      "Konoha mein sab waifu hunters hain!",
+    ],
+  },
+  {
+    name: "UzumakiKing",
+    avatar: "🌀",
+    messages: [
+      "Uzumaki style hunt karo!",
+      "Shadow clone jutsu for waifus!",
+      "Dattebayo!! Hunt karo!",
+    ],
+  },
+  {
+    name: "SandVillage",
+    avatar: "🏜️",
+    messages: [
+      "Desert se aayi waifu sabse rare hai",
+      "Sand jutsu + waifu = op combo",
+      "Gaara bhai kuch bolo!",
+    ],
+  },
+  {
+    name: "LeafNinja99",
+    avatar: "🌿",
+    messages: [
+      "Ninja way: collect waifus!",
+      "Leaf village mein best harams hain",
+      "Hokage ka sapna: poori waifu list!",
+    ],
+  },
+  {
+    name: "MistVillage",
+    avatar: "🌊",
+    messages: [
+      "Kirigakure se aaya hoon, waifus laaya hoon~",
+      "Bhai water style waifu rare hai!",
+      "Seven swordsmen of waifus lol",
+    ],
+  },
+  {
+    name: "CloudNin",
+    avatar: "⛅",
+    messages: [
+      "Kumogakure mein bhi waifu culture hai!",
+      "Lightning + waifu = Raikage approved",
+      "Bhai /daily maro free onex milega",
+    ],
+  },
+  {
+    name: "RockNinja",
+    avatar: "🪨",
+    messages: [
+      "Iwagakure rocks! Aur waifus bhi!",
+      "Earth style mein waifu bury nahi hoti 😂",
+      "Tsuchikage ki waifu list dekhi? 👀",
+    ],
+  },
+  {
+    name: "SoundVillage",
+    avatar: "🎵",
+    messages: [
+      "Orochimaru bhi waifu collector tha kya?",
+      "Sound four mein kaun best waifu hunter?",
+      "Bhai genjutsu waifu real lagti hai!",
+    ],
+  },
+  {
+    name: "RainNin",
+    avatar: "🌧️",
+    messages: [
+      "Amegakure mein baarish aur waifus dono!",
+      "Pain bhai waifu world domination plan!",
+      "Konan-san best waifu confirmed ✅",
+    ],
+  },
+  {
+    name: "AnimeOtaku01",
+    avatar: "🎌",
+    messages: [
+      "Bhai konsa anime dekh raha hai?",
+      "One Piece mein Nami best girl!",
+      "Bleach > Naruto fight karo!",
+    ],
+  },
+  {
+    name: "WaifuHunter99",
+    avatar: "💘",
+    messages: [
+      "Main aaaj 5 waifus claim karunga!",
+      "Rare waifu dekhte hi /hunt!",
+      "Bhai meri harem dekho~ 🎴",
+    ],
+  },
+  {
+    name: "SenpaiNoticed",
+    avatar: "👁️",
+    messages: [
+      "Senpai ne dekha! >///<",
+      "Kouhai ki waifu senpai se better? IMPOSSIBLE",
+      "Notice me senpai!!",
+    ],
+  },
+  {
+    name: "KawaiiDesu",
+    avatar: "🌸",
+    messages: [
+      "Kawaii waifu dekhke dil pighal gaya!",
+      "Moe moe kyun~ 💕",
+      "Ara ara~ ye waifu toh adorable hai!",
+    ],
+  },
+  {
+    name: "TsundereKing",
+    avatar: "😤",
+    messages: [
+      "B-baka! Main sirf waifus hunt kar raha tha!",
+      "Hmpf... ye waifu achhi nahi hai (it's good)",
+      "I-it's not like I wanted this waifu!",
+    ],
+  },
+  {
+    name: "YandereMode",
+    avatar: "🔪",
+    messages: [
+      "Ye waifu sirf meri hai... 👀",
+      "Jo bhi mere haram ko touch kare...",
+      "Daisuki~ *stares intensely*",
+    ],
+  },
+  {
+    name: "KuudereVibes",
+    avatar: "❄️",
+    messages: ["...(hunts quietly)", "Waifu acquired.", "...nice spawn."],
+  },
+  {
+    name: "DeredereSmile",
+    avatar: "😊",
+    messages: [
+      "Everyone deserves a good waifu!",
+      "Bhai team mein milke hunt karo!",
+      "Group mein sab best hain~",
+    ],
+  },
+  {
+    name: "ChunniCaster",
+    avatar: "🌑",
+    messages: [
+      "My dark powers activated for this waifu!",
+      "Chaos of the crimson world, grant me waifus!",
+      "Eighth element: rare waifu!",
+    ],
+  },
+  {
+    name: "MeganeKun",
+    avatar: "🤓",
+    messages: [
+      "Statistics bata rahe hain ye waifu S-tier hai",
+      "Bhai data analysis: 73% rare spawn chance",
+      "Calculated. /hunt karo.",
+    ],
+  },
+  {
+    name: "ShikimiKun",
+    avatar: "🌙",
+    messages: [
+      "Moonlit waifu is the best waifu",
+      "Tsukimi night mein rare waifus spawn hoti hain?",
+      "Bhai raat ko hunt karo, luck better hoga",
+    ],
+  },
+  {
+    name: "HoshikoSan",
+    avatar: "⭐",
+    messages: [
+      "Stars align karte hain jab rare waifu aati hai!",
+      "Hoshi bolta hai: /hunt karo!",
+      "Galactic waifu collection goals~",
+    ],
+  },
+  {
+    name: "YumesawaRyu",
+    avatar: "🐉",
+    messages: [
+      "Dragon hunter turned waifu hunter!",
+      "Ryuu no chikara for best waifu!",
+      "Bhai dragon waifu mil gayi!",
+    ],
+  },
+  {
+    name: "TornadoAce",
+    avatar: "🌪️",
+    messages: [
+      "Bhai storm ki tarah /hunt karo!",
+      "Wind style waifu? Temari-chan!",
+      "Tornado of waifus sweeping through!",
+    ],
+  },
+  {
+    name: "FlameUser99",
+    avatar: "🔥",
+    messages: [
+      "Katon jutsu activate for waifu hunt!",
+      "Bhai fire waifu best waifu!",
+      "Burning passion for rare waifus!",
+    ],
+  },
+  {
+    name: "IceWielder",
+    avatar: "🧊",
+    messages: [
+      "Ice waifu = cool waifu literally",
+      "Bhai Haku-chan waifu hai ya nahi 😂",
+      "Freeze! Waifu captured!",
+    ],
+  },
+  {
+    name: "ThunderBolt",
+    avatar: "⚡",
+    messages: [
+      "Lightning fast /hunt!",
+      "Bhai Killua vibes waifu hunt mein!",
+      "Raikiri speed pe waifu claim!",
+    ],
+  },
+  {
+    name: "EarthShaker",
+    avatar: "🌍",
+    messages: [
+      "Bhai ground type waifu underrated hai",
+      "Earth element waifu solidest waifu!",
+      "Tremor of waifus incoming!",
+    ],
+  },
+  {
+    name: "NatureLover",
+    avatar: "🌱",
+    messages: [
+      "Wood style: grow your waifu collection!",
+      "Yamato-senpai approved waifu!",
+      "Nature is the rarest waifu 🌿",
+    ],
+  },
+  {
+    name: "VoidWalker",
+    avatar: "🕳️",
+    messages: [
+      "Kamui portal se waifu steal karna 😂",
+      "Void between waifus... sad",
+      "Dimension hop for rare waifu!",
+    ],
+  },
+  {
+    name: "TimeKeeper",
+    avatar: "⏳",
+    messages: [
+      "Bhai /daily timer check karo",
+      "Time flies jab waifu hunt karo!",
+      "Hourly waifu spawn track kar raha hoon",
+    ],
+  },
+  {
+    name: "SpaceOtaku",
+    avatar: "🚀",
+    messages: [
+      "Galactic waifu hunt mission!",
+      "Astronaut who hunts waifus in orbit 😂",
+      "Houston, we have a rare waifu!",
+    ],
+  },
+  {
+    name: "OceanDiver",
+    avatar: "🌊",
+    messages: [
+      "Deep sea rare waifu found!",
+      "Underwater waifu expedition!",
+      "Bhai Kisame ka waifu game strong tha",
+    ],
+  },
+  {
+    name: "DesertRose",
+    avatar: "🌹",
+    messages: [
+      "Desert bloom: rare waifu appeared!",
+      "Oasis mein waifu rest kar rahi thi~",
+      "Sand and roses: perfect waifu combo",
+    ],
+  },
+  {
+    name: "MountainEcho",
+    avatar: "🏔️",
+    messages: [
+      "Mountain top pe rare waifu hai!",
+      "Climbing to waifu greatness!",
+      "Echo: waifuuuu waifuuuu 😂",
+    ],
+  },
+  {
+    name: "SkyPilot",
+    avatar: "✈️",
+    messages: [
+      "Sky high waifu collection!",
+      "Bhai clouds mein waifu fly kar rahi thi",
+      "Altitude: maximum waifu 🛫",
+    ],
+  },
+  {
+    name: "NightOwl99",
+    avatar: "🦉",
+    messages: [
+      "Night owl waifu hunter activate!",
+      "3am spawn check kar raha hoon 👀",
+      "Bhai late night best time for rare hunt!",
+    ],
+  },
+  {
+    name: "DawnBreaker",
+    avatar: "🌅",
+    messages: [
+      "Sunrise ke saath waifu hunt shuru!",
+      "Dawn waifu is rarest waifu~",
+      "Early bird gets the rare waifu!",
+    ],
+  },
+  {
+    name: "StormChaser",
+    avatar: "🌩️",
+    messages: [
+      "Chasing storms and waifus!",
+      "Thunder waifu appeared!",
+      "Bhai thunder clap /hunt karo!",
+    ],
+  },
+  {
+    name: "RainMaker",
+    avatar: "☔",
+    messages: [
+      "Rain brings rare waifus!",
+      "Bhai baarish mein waifu spawn chance +50%?",
+      "Rainy day waifu hunt best vibe~",
+    ],
+  },
+  {
+    name: "SnowDancer",
+    avatar: "❄️",
+    messages: [
+      "Snow waifu is COLD but BEAUTIFUL!",
+      "Winter hunt season shuru!",
+      "Bhai blizzard mein bhi /hunt karo",
+    ],
+  },
+  {
+    name: "SummerVibes",
+    avatar: "☀️",
+    messages: [
+      "Beach episode waifu best waifu!",
+      "Summer matsuri waifu hunt!",
+      "Bhai summer special rare spawn hoga!",
+    ],
+  },
+  {
+    name: "AutumnLeaf",
+    avatar: "🍂",
+    messages: [
+      "Autumn mein waifu gir rahi hain literally!",
+      "Maple leaf waifu aesthetic~",
+      "Bhai fall season best for hunting",
+    ],
+  },
+  {
+    name: "SpringBlossom",
+    avatar: "🌺",
+    messages: [
+      "Sakura season = waifu season!",
+      "Spring waifu freshest waifu~",
+      "Hanami event mein waifu hunt karo!",
+    ],
+  },
+  {
+    name: "MidnightRun",
+    avatar: "🌃",
+    messages: [
+      "Midnight city run aur waifu hunt!",
+      "City lights, rare waifu sights~",
+      "Bhai urban waifu aesthetic fire hai",
+    ],
+  },
+  {
+    name: "ForestSpirit",
+    avatar: "🌲",
+    messages: [
+      "Forest spirit ka ashirvad: rare waifu!",
+      "Bhai Mononoke vibes waifu hunt mein",
+      "Ancient forest hidden waifus!",
+    ],
+  },
+  {
+    name: "VolcanoKing",
+    avatar: "🌋",
+    messages: [
+      "Lava hot waifu appeared!",
+      "Volcanic rare spawn INCOMING!",
+      "Bhai eruption se rare waifu nikli!",
+    ],
+  },
+  {
+    name: "RiverFlow",
+    avatar: "🏞️",
+    messages: [
+      "River current le jaayega waifu tak!",
+      "Bhai flowing hair waifu best waifu",
+      "Stream of consciousness = waifu thoughts",
+    ],
+  },
+  {
+    name: "WildHunter",
+    avatar: "🏹",
+    messages: [
+      "Arrow shot! Waifu claimed!",
+      "Bhai precision /hunt karo!",
+      "Hunter instinct: rare waifu sense!",
+    ],
+  },
+  {
+    name: "ShadowStep",
+    avatar: "👥",
+    messages: [
+      "Bhai shadow clone already hunting!",
+      "Step into shadows, emerge with waifus~",
+      "ANBU operative on waifu mission!",
+    ],
+  },
+  {
+    name: "GhostRider",
+    avatar: "👻",
+    messages: [
+      "Ghost can still /hunt 😂",
+      "Spectral waifu? Only I can see her!",
+      "Bhai invisible waifu = mine alone!",
+    ],
+  },
+  {
+    name: "PhoenixRise",
+    avatar: "🦅",
+    messages: [
+      "Phoenix reborn with new waifu!",
+      "Ashes to rare waifus!",
+      "Bhai rebirth mechanic in waifu game?",
+    ],
+  },
+  {
+    name: "DragonFly",
+    avatar: "🦋",
+    messages: [
+      "Beautiful waifu flew by!",
+      "Butterfly effect: one hunt, whole harem!",
+      "Bhai transformation arc: waifu collector!",
+    ],
+  },
+  {
+    name: "TigerStreak",
+    avatar: "🐯",
+    messages: [
+      "RAWR = rare waifu appeared!",
+      "Tiger hunting waifu in wild!",
+      "Bhai tiger mode /hunt FAST!",
+    ],
+  },
+  {
+    name: "WolfPack",
+    avatar: "🐺",
+    messages: [
+      "Pack hunting waifus together!",
+      "Alpha gets first waifu!",
+      "Bhai wolf clan waifu team!",
+    ],
+  },
+  {
+    name: "BearGrip",
+    avatar: "🐻",
+    messages: [
+      "Bhai bear hug your waifu!",
+      "Grizzly rare waifu found!",
+      "Hibernate ends, waifu hunt begins!",
+    ],
+  },
+  {
+    name: "FoxTricks",
+    avatar: "🦊",
+    messages: [
+      "Kyuubi waifu is mine!",
+      "Fox tricks: steal rare waifu!",
+      "Bhai nine tails give nine waifus?",
+    ],
+  },
+  {
+    name: "RabbitSpeed",
+    avatar: "🐰",
+    messages: [
+      "Fast as bunny /hunt!",
+      "Bhai speed run waifu hunt!",
+      "Usagi speed for rare claim!",
+    ],
+  },
+  {
+    name: "CatPerson",
+    avatar: "🐱",
+    messages: [
+      "Nyan~ waifu dekhke dil bahar aayi!",
+      "Cat girls best waifu category!",
+      "Bhai nekopara vibes in this group!",
+    ],
+  },
+  {
+    name: "DogLoyalty",
+    avatar: "🐕",
+    messages: [
+      "Loyal like dog to my waifu!",
+      "Bhai Akamaru waifu finder?",
+      "Good boy gets good waifu!",
+    ],
+  },
+  {
+    name: "PandaVibes",
+    avatar: "🐼",
+    messages: [
+      "Panda rare like S-tier waifu!",
+      "Black and white = balanced waifu taste!",
+      "Bhai panda waifu adorable hai!",
+    ],
+  },
+  {
+    name: "EagleEye",
+    avatar: "🦅",
+    messages: [
+      "Eagle eye spots rare waifu first!",
+      "Bhai aerial view of waifu spawn!",
+      "Soaring to waifu greatness!",
+    ],
+  },
+  {
+    name: "LionPride",
+    avatar: "🦁",
+    messages: [
+      "King of waifus!",
+      "Pride: my waifu collection!",
+      "Bhai lion heart for best waifu!",
+    ],
+  },
+  {
+    name: "SnakeSense",
+    avatar: "🐍",
+    messages: [
+      "Orochimaru-style waifu sense!",
+      "Slither to the rare waifu~",
+      "Bhai snake eyes on spawn!",
+    ],
+  },
+  {
+    name: "SwordMaster",
+    avatar: "⚔️",
+    messages: [
+      "Blade of waifu justice!",
+      "Bhai kenjutsu waifu hunt!",
+      "Slash! Waifu claimed!",
+    ],
+  },
+  {
+    name: "ShieldBearer",
+    avatar: "🛡️",
+    messages: [
+      "Protecting my waifu collection!",
+      "Bhai shield > sword for waifu safety",
+      "Guardian of the harem!",
+    ],
+  },
+  {
+    name: "CannonBall",
+    avatar: "💣",
+    messages: [
+      "BOOM! Rare waifu found!",
+      "Bhai explosive entry into harem!",
+      "Cannon fodder for waifus? Worth it!",
+    ],
+  },
+  {
+    name: "RocketPunch",
+    avatar: "🤜",
+    messages: [
+      "ROCKET PUNCH waifu!!",
+      "Bhai Gurren Lagann vibes!",
+      "Who the hell do you think waifus are?!",
+    ],
+  },
+  {
+    name: "LaserBeam",
+    avatar: "🔆",
+    messages: [
+      "Laser focused on waifu hunt!",
+      "Bhai beam of rare waifu energy!",
+      "Pew pew waifu claimed!",
+    ],
+  },
+  {
+    name: "MagicCircle",
+    avatar: "🔯",
+    messages: [
+      "Magic circle summon rare waifu!",
+      "Bhai alchemy for waifu?",
+      "Transmutation: coins to waifus!",
+    ],
+  },
+  {
+    name: "CrystalBall",
+    avatar: "🔮",
+    messages: [
+      "Crystal ball predicted rare spawn!",
+      "Bhai fortune teller confirmed waifu!",
+      "Future vision: I see waifus~",
+    ],
+  },
+  {
+    name: "RuneWriter",
+    avatar: "📜",
+    messages: [
+      "Ancient runes guide to rare waifu!",
+      "Bhai runic waifu knowledge!",
+      "Mystical inscription: /hunt!",
+    ],
+  },
+  {
+    name: "PotionBrew",
+    avatar: "⚗️",
+    messages: [
+      "Potion of waifu luck crafted!",
+      "Bhai alchemist brewed rare spawn!",
+      "Drink up: waifu probability +100%!",
+    ],
+  },
+  {
+    name: "TomeReader",
+    avatar: "📚",
+    messages: [
+      "Ancient tome of waifus found!",
+      "Bhai reading all waifu lore!",
+      "Knowledge = more waifus somehow!",
+    ],
+  },
+  {
+    name: "MapMaker",
+    avatar: "🗺️",
+    messages: [
+      "Mapping all waifu spawn locations!",
+      "Bhai treasure map to rare waifu!",
+      "X marks the waifu spot!",
+    ],
+  },
+  {
+    name: "CompassSpin",
+    avatar: "🧭",
+    messages: [
+      "Compass points to rare waifu!",
+      "Bhai navigating harem expansion!",
+      "True north = best waifu direction!",
+    ],
+  },
+  {
+    name: "GadgetGuru",
+    avatar: "⚙️",
+    messages: [
+      "Tech gadget locate rare waifu!",
+      "Bhai engineering waifu solutions!",
+      "Gear up for waifu hunt!",
+    ],
+  },
+  {
+    name: "TreasureSeek",
+    avatar: "💰",
+    messages: [
+      "X marks waifu treasure!",
+      "Bhai gold = onex = waifus!",
+      "Chest opened: rare waifu inside!",
+    ],
+  },
+  {
+    name: "GemCutter",
+    avatar: "💎",
+    messages: [
+      "Diamond rare waifu found!",
+      "Bhai precious stone = precious waifu!",
+      "Cut and polished waifu collection!",
+    ],
+  },
+  {
+    name: "CrownWearer",
+    avatar: "👑",
+    messages: [
+      "King claims the best waifus!",
+      "Bhai royal decree: /hunt karo!",
+      "Crown worthy waifu acquired!",
+    ],
+  },
+  {
+    name: "AnvilForge",
+    avatar: "⚒️",
+    messages: [
+      "Forged my waifu collection in steel!",
+      "Bhai blacksmith of waifus!",
+      "Hammered out rare waifu claim!",
+    ],
+  },
+  {
+    name: "BrushStroke",
+    avatar: "🖌️",
+    messages: [
+      "Painting my ideal waifu!",
+      "Bhai artist waifu collection best!",
+      "Masterpiece: my harem!",
+    ],
+  },
+  {
+    name: "NoteMusician",
+    avatar: "🎵",
+    messages: [
+      "Music waifu > regular waifu!",
+      "Bhai anime soundtrack + waifu = 💯",
+      "Melody of rare waifu hunt~",
+    ],
+  },
+  {
+    name: "DrumBeat",
+    avatar: "🥁",
+    messages: [
+      "BOOM BOOM waifu appeared!",
+      "Bhai rhythm of /hunt!",
+      "Drumroll for rare waifu...",
+    ],
+  },
+  {
+    name: "GuitarShred",
+    avatar: "🎸",
+    messages: [
+      "SHRED! Rare waifu unlocked!",
+      "Bhai rock and roll waifu life!",
+      "Guitar solo for best waifu!",
+    ],
+  },
+  {
+    name: "PianoKeys",
+    avatar: "🎹",
+    messages: [
+      "Classical taste: best waifus!",
+      "Bhai piano waifu most elegant!",
+      "Keys of waifu destiny~",
+    ],
+  },
+  {
+    name: "TrumpetCall",
+    avatar: "🎺",
+    messages: [
+      "TRUMPET CALL: rare waifu here!",
+      "Bhai herald announces waifu spawn!",
+      "Fanfare for legendary waifu!",
+    ],
+  },
+  {
+    name: "CameraSnap",
+    avatar: "📸",
+    messages: [
+      "Snap! Waifu photo taken!",
+      "Bhai photographer of rare waifus!",
+      "Album full of waifu memories~",
+    ],
+  },
+  {
+    name: "FilmRoll",
+    avatar: "🎬",
+    messages: [
+      "ACTION! Waifu scene!",
+      "Bhai director of waifu drama!",
+      "Cut! Perfect waifu take!",
+    ],
+  },
+  {
+    name: "GamePadPro",
+    avatar: "🎮",
+    messages: [
+      "GG! Waifu boss defeated!",
+      "Bhai gamer has best waifu taste!",
+      "PLAYER 1 claimed rare waifu!",
+    ],
+  },
+  {
+    name: "DiceRoller",
+    avatar: "🎲",
+    messages: [
+      "Rolled 20! Rare waifu!",
+      "Bhai luck stat maxed for hunt!",
+      "Dice says: /hunt now!",
+    ],
+  },
+  {
+    name: "ChessKing",
+    avatar: "♟️",
+    messages: [
+      "Strategic waifu collection!",
+      "Bhai chess master of harams!",
+      "Checkmate! Waifu mine!",
+    ],
+  },
+  {
+    name: "CardDealer",
+    avatar: "🃏",
+    messages: [
+      "Wild card: rare waifu!",
+      "Bhai card game = waifu game!",
+      "Full house of waifus!",
+    ],
+  },
+  {
+    name: "PuzzlePiece",
+    avatar: "🧩",
+    messages: [
+      "Last piece: found my waifu!",
+      "Bhai puzzle complete = harem complete!",
+      "Fitting waifu into collection~",
+    ],
+  },
+  {
+    name: "TrophyCase",
+    avatar: "🏆",
+    messages: [
+      "Trophy: best waifu collector!",
+      "Bhai championship in /hunt!",
+      "Gold medal harem winner!",
+    ],
+  },
+  {
+    name: "LanternLight",
+    avatar: "🏮",
+    messages: [
+      "Lantern guides to rare waifu!",
+      "Bhai festival waifu season!",
+      "Light in darkness = rare spawn!",
+    ],
+  },
+  {
+    name: "FireworkBurst",
+    avatar: "🎆",
+    messages: [
+      "BOOM! Rare waifu appeared!",
+      "Bhai celebrate waifu with fireworks!",
+      "Spectacular waifu spawn!",
+    ],
+  },
+  {
+    name: "BalloonFly",
+    avatar: "🎈",
+    messages: [
+      "Float to rare waifu!",
+      "Bhai party time: new waifu!",
+      "Balloon wishes: best waifu!",
+    ],
+  },
+  {
+    name: "ConfettiFall",
+    avatar: "🎊",
+    messages: [
+      "CONFETTI! Rare waifu!",
+      "Bhai celebration for new harem member!",
+      "Party popper: waifu unlocked!",
+    ],
+  },
+  {
+    name: "RamenLover",
+    avatar: "🍜",
+    messages: [
+      "Naruto ramen + waifu = life!",
+      "Bhai ramen shop waifu encounter!",
+      "Slurp! Waifu fuel!",
+    ],
+  },
+  {
+    name: "SushiRoll",
+    avatar: "🍱",
+    messages: [
+      "Japanese culture: anime + sushi + waifu!",
+      "Bhai sushi chef waifu?",
+      "Roll roll roll your waifu~",
+    ],
+  },
+  {
+    name: "MochiBite",
+    avatar: "🍡",
+    messages: [
+      "Mochi soft like good waifu!",
+      "Bhai wagashi store waifu date!",
+      "Sweet and sticky waifu feelings~",
+    ],
+  },
+  {
+    name: "MatcaTime",
+    avatar: "🍵",
+    messages: [
+      "Matcha tea with my waifu~",
+      "Bhai japanese tea ceremony waifu!",
+      "Bitter tea, sweet waifu balance!",
+    ],
+  },
+  {
+    name: "SakuraBranch",
+    avatar: "🌸",
+    messages: [
+      "Sakura season = waifu everywhere!",
+      "Bhai hanami picnic with waifu!",
+      "Petals fall, waifus spawn~",
+    ],
+  },
+  {
+    name: "BonsaiTree",
+    avatar: "🌳",
+    messages: [
+      "Patient like bonsai, wait for rare!",
+      "Bhai cultivation of waifu collection!",
+      "Ancient tree, ancient waifu wisdom!",
+    ],
+  },
+  {
+    name: "LotusFlower",
+    avatar: "🪷",
+    messages: [
+      "Pure as lotus = pure waifu!",
+      "Bhai lotus blooms = rare spawn!",
+      "Rising from water: rare waifu!",
+    ],
+  },
+  {
+    name: "KoiFish",
+    avatar: "🐟",
+    messages: [
+      "Koi fish luck for rare waifu!",
+      "Bhai Japanese koi pond waifu scene!",
+      "Colorful koi = colorful harem!",
+    ],
+  },
+  {
+    name: "ToriiGate",
+    avatar: "⛩️",
+    messages: [
+      "Shrine maiden waifu incoming!",
+      "Bhai kami-sama bless my hunt!",
+      "Sacred gate of waifus!",
+    ],
+  },
+  {
+    name: "FujiSan",
+    avatar: "🗻",
+    messages: [
+      "Mt Fuji bless this rare waifu!",
+      "Bhai summit: best waifu view!",
+      "Climb to the top of waifu ranking!",
+    ],
+  },
+  {
+    name: "NightSkyGaze",
+    avatar: "🌌",
+    messages: [
+      "Galaxy full of waifus~",
+      "Bhai space waifu collection!",
+      "Milky way = waifu highway!",
+    ],
+  },
+  {
+    name: "CometTail",
+    avatar: "☄️",
+    messages: [
+      "Comet speed /hunt!",
+      "Bhai wish on shooting waifu!",
+      "Make a wish: rare waifu!",
+    ],
+  },
+  {
+    name: "SolarFlare",
+    avatar: "🌞",
+    messages: [
+      "Sun-powered waifu hunt!",
+      "Bhai solar energy for /hunt!",
+      "Flare up: rare waifu spawn!",
+    ],
+  },
+  {
+    name: "LunarGlow",
+    avatar: "🌙",
+    messages: [
+      "Moon goddess waifu best!",
+      "Bhai lunar calendar rare spawn?",
+      "Moonlit waifu = most romantic~",
+    ],
+  },
+  {
+    name: "AuroraWatch",
+    avatar: "🌈",
+    messages: [
+      "Rainbow = all waifus collected!",
+      "Bhai aurora borealis waifu!",
+      "Colorful harem like aurora!",
+    ],
+  },
+  {
+    name: "CloudRider",
+    avatar: "☁️",
+    messages: [
+      "Riding clouds to rare waifu!",
+      "Bhai nimbus cloud + waifu!",
+      "Above the clouds: legendary waifu!",
+    ],
+  },
+  {
+    name: "ZephyrWind",
+    avatar: "💨",
+    messages: [
+      "Wind carries waifu to me!",
+      "Bhai breeze = rare spawn hint!",
+      "Zephyr brings rare waifu news~",
+    ],
+  },
+  {
+    name: "OniSlayer",
+    avatar: "👹",
+    messages: [
+      "Oni mode: hunting waifus!",
+      "Bhai demon slayer of rare waifus!",
+      "FORM THREE: waifu obliteration!",
+    ],
+  },
+  {
+    name: "TenguFlight",
+    avatar: "🦅",
+    messages: [
+      "Tengu flies to rare waifu spawn!",
+      "Bhai mountain spirit waifu!",
+      "Wind and feathers: rare waifu!",
+    ],
+  },
+  {
+    name: "KitsunePlay",
+    avatar: "🦊",
+    messages: [
+      "Kitsune tricks: extra waifu!",
+      "Bhai nine-tail fox = nine waifus!",
+      "Illusion or real? It is a rare waifu!",
+    ],
+  },
+  {
+    name: "TanukiLuck",
+    avatar: "🦝",
+    messages: [
+      "Tanuki shapeshifts into waifu... just kidding 😂",
+      "Bhai raccoon dog lucky for /hunt!",
+      "Transformation magic: waifu luck +!",
+    ],
+  },
+  {
+    name: "DaitenguSoar",
+    avatar: "🌬️",
+    messages: [
+      "Mountain wind brings rare waifu!",
+      "Bhai high altitude rare spawns!",
+      "Tengu art: master waifu hunting!",
+    ],
+  },
+  {
+    name: "RyuJinDeep",
+    avatar: "🌊",
+    messages: [
+      "Dragon god of sea sends rare waifu!",
+      "Bhai ocean deity waifu blessing!",
+      "Deep sea rare waifu unlocked!",
+    ],
+  },
+  {
+    name: "AmaterasuGlow",
+    avatar: "☀️",
+    messages: [
+      "Sun goddess blessed this waifu!",
+      "Bhai divine light on rare spawn!",
+      "Amaterasu no waifu = legendary!",
+    ],
+  },
+  {
+    name: "SusanooStrike",
+    avatar: "⛈️",
+    messages: [
+      "SUSANOO ACTIVATED for rare waifu!",
+      "Bhai storm god waifu hunt!",
+      "Divine technique: waifu claim!",
+    ],
+  },
+  {
+    name: "TsukuyomiDream",
+    avatar: "🌙",
+    messages: [
+      "Dream world waifu is realest waifu!",
+      "Bhai moon god shows rare spawn!",
+      "Eternal moonlight waifu~",
+    ],
+  },
+  {
+    name: "IzanagiCreate",
+    avatar: "✨",
+    messages: [
+      "Creation deity: spawned rare waifu!",
+      "Bhai god-level waifu taste!",
+      "Izanagi no waifu = top tier!",
+    ],
+  },
+];
+
 function formatTime(ts: bigint | number): string {
   const ms = typeof ts === "bigint" ? Number(ts) / 1_000_000 : ts;
   return new Date(ms).toLocaleTimeString("en-US", {
@@ -392,6 +1531,9 @@ export default function ChatWindow({
     }
   });
   const botsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeMembersIntervalRef = useRef<ReturnType<
+    typeof setInterval
+  > | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [mentionDropdown, setMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -414,6 +1556,20 @@ export default function ChatWindow({
 
   // Per-group spawn interval & message count
   const [spawnInterval, setSpawnInterval] = useState(15);
+  const [inCall, setInCall] = useState(false);
+  const [micOn, setMicOn] = useState(true);
+  const [callParticipants, setCallParticipants] = useState<string[]>([]);
+  const [groupPhotoUrl, setGroupPhotoUrl] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem(`sinzhu_group_photo_${groupName ?? ""}`) || ""
+      );
+    } catch {
+      return "";
+    }
+  });
+  const [showHaremView, setShowHaremView] = useState(false);
+  const groupPhotoInputRef = useRef<HTMLInputElement>(null);
   const msgCountRef = useRef(0);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -471,6 +1627,58 @@ export default function ChatWindow({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botsActive, isGroup, spawnInterval]);
+
+  // Active members — always-on background chat (independent of botsActive)
+  useEffect(() => {
+    if (!isGroup) return;
+    const fireMsg = () => {
+      const member =
+        ACTIVE_MEMBERS[Math.floor(Math.random() * ACTIVE_MEMBERS.length)];
+      let msg =
+        member.messages[Math.floor(Math.random() * member.messages.length)];
+      // Occasionally mention the user
+      const uname = (() => {
+        try {
+          const p = JSON.parse(localStorage.getItem("sinzhu_profile") || "{}");
+          return p.username || p.displayName || "";
+        } catch {
+          return "";
+        }
+      })();
+      if (uname && Math.random() < 0.15) {
+        msg = `${msg} @${uname}`;
+      } else if (Math.random() < 0.1) {
+        const otherMember =
+          ACTIVE_MEMBERS[Math.floor(Math.random() * ACTIVE_MEMBERS.length)];
+        msg = `${msg} @${otherMember.name}`;
+      }
+      setBotMessages((prev) => [
+        ...prev,
+        {
+          id: `active-${Date.now()}-${Math.random()}`,
+          content: msg,
+          timestamp: Date.now(),
+          senderName: `${member.avatar} ${member.name}`,
+          isUserMessage: true,
+          isOwn: false,
+        },
+      ]);
+    };
+    const scheduleNext = () => {
+      const delay = 5000 + Math.random() * 5000;
+      activeMembersIntervalRef.current = setTimeout(() => {
+        fireMsg();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+    return () => {
+      if (activeMembersIntervalRef.current) {
+        clearTimeout(activeMembersIntervalRef.current);
+        activeMembersIntervalRef.current = null;
+      }
+    };
+  }, [isGroup]);
 
   // Rotate placeholder hints
   useEffect(() => {
@@ -800,24 +2008,7 @@ export default function ChatWindow({
         }
 
         case "/harem": {
-          const backendIds = harem.map((h) => h.characterId);
-          const allIds = Array.from(new Set([...backendIds, ...localHaremIds]));
-          if (allIds.length === 0) {
-            addBotMessage(
-              "🎴 Your harem is empty! Start hunting waifus with /hunt~ 🍀",
-            );
-          } else {
-            const haremChars = allIds
-              .map((id) => SEED_WAIFUS.find((w) => w.id === id))
-              .filter(Boolean);
-            const lines = haremChars.map((c) => {
-              const ri = RARITY_CONFIG[c!.rarity] ?? RARITY_CONFIG.common;
-              return `${ri.icon} ${c!.name} — ${ri.label}`;
-            });
-            addBotMessage(
-              `🎴 Your Harem Collection (${haremChars.length} waifus):\n${lines.join("\n")}`,
-            );
-          }
+          setShowHaremView(true);
           return;
         }
 
@@ -1082,7 +2273,7 @@ export default function ChatWindow({
           return;
         }
 
-        case "/on": {
+        case "/oon": {
           if (botsActive) {
             addBotMessage(
               "🤖 Anime bots pehle se active hain! Use /off to stop them.",
@@ -1135,7 +2326,7 @@ export default function ChatWindow({
           return;
         }
 
-        case "/off": {
+        case "/oof": {
           if (!botsActive) {
             addBotMessage(
               "🤖 Anime bots pehle se inactive hain! Use /on to activate them.",
@@ -1289,17 +2480,41 @@ export default function ChatWindow({
           <ArrowLeft className="w-5 h-5" />
         </button>
 
-        <div className="relative flex-shrink-0">
+        <div
+          className="relative flex-shrink-0 group/avatar"
+          onClick={() => isGroup && groupPhotoInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              isGroup && groupPhotoInputRef.current?.click();
+            }
+          }}
+          role={isGroup ? "button" : undefined}
+          tabIndex={isGroup ? 0 : undefined}
+          style={{ cursor: isGroup ? "pointer" : "default" }}
+        >
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white"
+            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white overflow-hidden"
             style={{
               background: isGroup ? stringToColor(groupName ?? "") : "#5288c1",
             }}
           >
-            {isGroup
-              ? (groupName?.[0]?.toUpperCase() ?? "G")
-              : (chatTitle?.[0]?.toUpperCase() ?? "U")}
+            {groupPhotoUrl && isGroup ? (
+              <img
+                src={groupPhotoUrl}
+                alt="group"
+                className="w-full h-full object-cover"
+              />
+            ) : isGroup ? (
+              (groupName?.[0]?.toUpperCase() ?? "G")
+            ) : (
+              (chatTitle?.[0]?.toUpperCase() ?? "U")
+            )}
           </div>
+          {isGroup && (
+            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+              <Camera className="w-4 h-4 text-white" />
+            </div>
+          )}
           <span
             className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
             style={{
@@ -1307,6 +2522,31 @@ export default function ChatWindow({
               borderColor: "#17212b",
             }}
           />
+          {isGroup && (
+            <input
+              type="file"
+              accept="image/*"
+              ref={groupPhotoInputRef}
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const url = ev.target?.result as string;
+                  if (url) {
+                    localStorage.setItem(
+                      `sinzhu_group_photo_${groupName ?? ""}`,
+                      url,
+                    );
+                    setGroupPhotoUrl(url);
+                    toast.success("Group photo updated!");
+                  }
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+          )}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -1323,13 +2563,18 @@ export default function ChatWindow({
 
         {isGroup && (
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                addBotMessage(
-                  "📞 Group call shuru ho gaya! Sabhi members join kar sakte hain. ANIME_BOTS join kar rahe hain...",
-                );
-                setTimeout(() => {
+            {!inCall ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setInCall(true);
+                  const participants = ANIME_BOTS.slice(0, 5).map(
+                    (b) => b.name,
+                  );
+                  setCallParticipants(participants);
+                  addBotMessage(
+                    "📞 Group call shuru ho gaya! Sabhi members join kar sakte hain.",
+                  );
                   ANIME_BOTS.slice(0, 3).forEach((bot, i) => {
                     setTimeout(
                       () => {
@@ -1348,15 +2593,15 @@ export default function ChatWindow({
                       (i + 1) * 1500,
                     );
                   });
-                }, 500);
-              }}
-              className="w-8 h-8 flex items-center justify-center rounded-full transition-all hover:brightness-125"
-              style={{ background: "#1c3a20", color: "#3b9e5a" }}
-              data-ocid="chat.call.button"
-              title="Start Group Call"
-            >
-              <Phone className="w-4 h-4" />
-            </button>
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-full transition-all hover:brightness-125"
+                style={{ background: "#1c3a20", color: "#3b9e5a" }}
+                data-ocid="chat.call.button"
+                title="Start Group Call"
+              >
+                <Phone className="w-4 h-4" />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setShowInfo(true)}
@@ -1369,6 +2614,60 @@ export default function ChatWindow({
           </div>
         )}
       </div>
+
+      {/* Group Call Bar */}
+      {isGroup && inCall && (
+        <div
+          className="flex items-center gap-3 px-4 py-2 flex-shrink-0"
+          style={{ background: "#1a3a22", borderBottom: "1px solid #2d6a35" }}
+          data-ocid="chat.call.panel"
+        >
+          <span
+            className="flex items-center gap-2 flex-1 text-sm font-semibold"
+            style={{ color: "#4caf72" }}
+          >
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" />
+            📞 Group call • {callParticipants.length + 1} participants
+          </span>
+          <button
+            type="button"
+            title={micOn ? "Mute mic" : "Unmute mic"}
+            onClick={() => {
+              setMicOn((prev) => {
+                toast(prev ? "🔇 Mic muted" : "🎤 Mic unmuted");
+                return !prev;
+              });
+            }}
+            className="w-8 h-8 flex items-center justify-center rounded-full transition-all"
+            style={{
+              background: micOn ? "#1c3a20" : "#3a1c1c",
+              color: micOn ? "#3b9e5a" : "#e05555",
+            }}
+            data-ocid="chat.call.mic.toggle"
+          >
+            {micOn ? (
+              <Mic className="w-4 h-4" />
+            ) : (
+              <MicOff className="w-4 h-4" />
+            )}
+          </button>
+          <button
+            type="button"
+            title="Leave call"
+            onClick={() => {
+              setInCall(false);
+              setCallParticipants([]);
+              addBotMessage("📞 Aap ne call leave kar diya.");
+              toast("📞 Call left");
+            }}
+            className="w-8 h-8 flex items-center justify-center rounded-full transition-all"
+            style={{ background: "#3a1c1c", color: "#e05555" }}
+            data-ocid="chat.call.leave.button"
+          >
+            <PhoneOff className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Waifu Spawn Banner */}
       <AnimatePresence>
@@ -1406,296 +2705,442 @@ export default function ChatWindow({
         )}
       </AnimatePresence>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1">
-        {mergedMessages.length === 0 && (
+      {/* Inline Harem View */}
+      {showHaremView ? (
+        <div
+          className="flex-1 flex flex-col overflow-hidden"
+          style={{ background: "#17212b" }}
+        >
+          {/* Harem top bar */}
           <div
-            className="flex-1 flex items-center justify-center"
-            data-ocid="chat.messages.empty_state"
+            className="flex items-center px-3 py-3 flex-shrink-0"
+            style={{ background: "#17212b", borderBottom: "1px solid #1c2733" }}
           >
-            <div className="text-center">
-              <div className="text-4xl mb-3">{isGroup ? "💬" : "✉️"}</div>
-              <p className="font-semibold" style={{ color: "#8eacbb" }}>
-                {isGroup ? `Say hi to ${groupName}!` : "Start a conversation!"}
-              </p>
-              <p className="text-xs mt-1" style={{ color: "#4a6278" }}>
-                {isGroup
-                  ? "Use /hunt to catch waifus"
-                  : "Send a direct message"}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowHaremView(false)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold mr-3"
+              style={{ background: "#1c2f45", color: "#87CEEB" }}
+              data-ocid="harem.back.button"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+            <p
+              className="flex-1 text-center text-base font-bold"
+              style={{ color: "#e8f4fd", marginRight: "3.5rem" }}
+            >
+              🎴 My Harem
+            </p>
           </div>
-        )}
-
-        {isGroup
-          ? mergedMessages.map((item, i) => {
-              if (item._type === "bot") {
+          {/* Harem content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {(() => {
+              const backendIds = harem.map((h) => h.characterId);
+              const allIds = Array.from(
+                new Set([...backendIds, ...localHaremIds]),
+              );
+              const waifuPool =
+                uploadedWaifus.length > 0 ? uploadedWaifus : SEED_WAIFUS;
+              const haremChars = allIds
+                .map(
+                  (id) =>
+                    waifuPool.find((w) => w.id === id) ??
+                    SEED_WAIFUS.find((w) => w.id === id),
+                )
+                .filter(Boolean) as import("../backend").WaifuCharacter[];
+              if (haremChars.length === 0) {
                 return (
-                  <BotMessageBubble
-                    key={item.msg.id}
-                    message={item.msg}
-                    isWaifuSpawnCard={!!item.msg.isWaifuSpawnCard}
-                  />
-                );
-              }
-              const msg = item.msg;
-              const isOwn =
-                myPrincipal &&
-                msg.senderPrincipal.toString() === myPrincipal.toString();
-              if (msg.isWaifuSpawn) {
-                return (
-                  <div key={msg.id ?? i} className="flex justify-center my-2">
-                    <div
-                      className="px-4 py-2 rounded-xl text-center max-w-xs"
-                      style={{
-                        background: "#1c3a50",
-                        border: "1px solid #5288c1",
-                      }}
-                    >
+                  <div
+                    className="flex-1 flex items-center justify-center h-full pt-16 text-center"
+                    data-ocid="harem.empty_state"
+                  >
+                    <div>
+                      <div className="text-5xl mb-4">🎴</div>
                       <p
-                        className="text-xs font-bold"
-                        style={{ color: "#87CEEB" }}
+                        className="text-base font-semibold"
+                        style={{ color: "#8eacbb" }}
                       >
-                        ✨ A waifu appeared!
+                        Your harem is empty!
                       </p>
-                      <p className="text-xs" style={{ color: "#8eacbb" }}>
-                        Type /hunt to claim!
+                      <p className="text-sm mt-1" style={{ color: "#4a6278" }}>
+                        Hunt waifus with /hunt~ 🍀
                       </p>
                     </div>
                   </div>
                 );
               }
-              // Check if this message mentions me
-              const mentionsMe = myUsername
-                ? new RegExp(`@${myUsername}\\b`, "i").test(msg.content)
-                : false;
               return (
-                <MessageBubble
-                  key={msg.id ?? i}
-                  content={msg.content}
-                  senderName={msg.senderName || "Unknown"}
-                  timestamp={msg.timestamp}
-                  isOwn={!!isOwn}
-                  isGroup
-                  mentionsMe={mentionsMe}
-                  myUsername={myUsername}
-                  onRendered={() => {
-                    if (mentionsMe && !isOwn)
-                      checkMentionsInMessage(
-                        msg.content,
-                        msg.senderName || "Unknown",
-                      );
+                <div
+                  className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+                  data-ocid="harem.list"
+                >
+                  {haremChars.map((waifu, idx) => {
+                    const ri =
+                      RARITY_CONFIG[waifu.rarity] ?? RARITY_CONFIG.common;
+                    return (
+                      <div
+                        key={waifu.id}
+                        className="rounded-xl overflow-hidden flex flex-col"
+                        style={{
+                          background: "#1c2733",
+                          border: "1px solid #2b3d54",
+                        }}
+                        data-ocid={`harem.item.${idx + 1}`}
+                      >
+                        <img
+                          src={waifu.imageUrl}
+                          alt={waifu.name}
+                          className="w-full object-cover"
+                          style={{ height: "140px", filter: "none" }}
+                        />
+                        <div className="p-2 flex flex-col gap-1 flex-1">
+                          <p
+                            className="text-xs font-bold truncate"
+                            style={{ color: "#e8f4fd" }}
+                          >
+                            {waifu.name}
+                          </p>
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded-full font-semibold self-start"
+                            style={{
+                              background: `${ri.color}33`,
+                              color: ri.color,
+                              fontSize: "0.65rem",
+                            }}
+                          >
+                            {ri.icon} {ri.label}
+                          </span>
+                          <button
+                            type="button"
+                            className="mt-auto text-xs py-1 rounded-lg font-semibold transition-all hover:brightness-110"
+                            style={{ background: "#3a1c1c", color: "#e05555" }}
+                            data-ocid={`harem.delete_button.${idx + 1}`}
+                            onClick={() => {
+                              const newIds = localHaremIds.filter(
+                                (id) => id !== waifu.id,
+                              );
+                              setLocalHaremIds(newIds);
+                              localStorage.setItem(
+                                `sinzhu_local_harem_${groupName}`,
+                                JSON.stringify(newIds),
+                              );
+                              toast.success("Waifu sold! 💸");
+                            }}
+                          >
+                            💸 Sell
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1">
+            {mergedMessages.length === 0 && (
+              <div
+                className="flex-1 flex items-center justify-center"
+                data-ocid="chat.messages.empty_state"
+              >
+                <div className="text-center">
+                  <div className="text-4xl mb-3">{isGroup ? "💬" : "✉️"}</div>
+                  <p className="font-semibold" style={{ color: "#8eacbb" }}>
+                    {isGroup
+                      ? `Say hi to ${groupName}!`
+                      : "Start a conversation!"}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "#4a6278" }}>
+                    {isGroup
+                      ? "Use /hunt to catch waifus"
+                      : "Send a direct message"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {isGroup
+              ? mergedMessages.map((item, i) => {
+                  if (item._type === "bot") {
+                    return (
+                      <BotMessageBubble
+                        key={item.msg.id}
+                        message={item.msg}
+                        isWaifuSpawnCard={!!item.msg.isWaifuSpawnCard}
+                      />
+                    );
+                  }
+                  const msg = item.msg;
+                  const isOwn =
+                    myPrincipal &&
+                    msg.senderPrincipal.toString() === myPrincipal.toString();
+                  if (msg.isWaifuSpawn) {
+                    return (
+                      <div
+                        key={msg.id ?? i}
+                        className="flex justify-center my-2"
+                      >
+                        <div
+                          className="px-4 py-2 rounded-xl text-center max-w-xs"
+                          style={{
+                            background: "#1c3a50",
+                            border: "1px solid #5288c1",
+                          }}
+                        >
+                          <p
+                            className="text-xs font-bold"
+                            style={{ color: "#87CEEB" }}
+                          >
+                            ✨ A waifu appeared!
+                          </p>
+                          <p className="text-xs" style={{ color: "#8eacbb" }}>
+                            Type /hunt to claim!
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // Check if this message mentions me
+                  const mentionsMe = myUsername
+                    ? new RegExp(`@${myUsername}\\b`, "i").test(msg.content)
+                    : false;
+                  return (
+                    <MessageBubble
+                      key={msg.id ?? i}
+                      content={msg.content}
+                      senderName={msg.senderName || "Unknown"}
+                      timestamp={msg.timestamp}
+                      isOwn={!!isOwn}
+                      isGroup
+                      mentionsMe={mentionsMe}
+                      myUsername={myUsername}
+                      onRendered={() => {
+                        if (mentionsMe && !isOwn)
+                          checkMentionsInMessage(
+                            msg.content,
+                            msg.senderName || "Unknown",
+                          );
+                      }}
+                    />
+                  );
+                })
+              : (dmMessages as import("../backend").DMMessage[]).map((msg) => {
+                  const isOwn =
+                    myPrincipal &&
+                    msg.fromUser.toString() === myPrincipal.toString();
+                  return (
+                    <MessageBubble
+                      key={msg.timestamp.toString() + msg.fromUser.toString()}
+                      content={msg.content}
+                      senderName={isOwn ? "You" : (chatTitle ?? "")}
+                      timestamp={msg.timestamp}
+                      isOwn={!!isOwn}
+                      isGroup={false}
+                      mentionsMe={false}
+                      myUsername={myUsername}
+                    />
+                  );
+                })}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Command hints chip + popup */}
+          {isGroup && identity && (
+            <div className="px-3 pb-1 flex-shrink-0 relative">
+              <AnimatePresence>
+                {showCommands && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    className="absolute bottom-full left-3 right-3 mb-2 rounded-xl overflow-hidden z-50"
+                    style={{
+                      background: "#1c2733",
+                      border: "1px solid #2b3d54",
+                    }}
+                    data-ocid="chat.commands.popover"
+                  >
+                    <div className="p-3 max-h-64 overflow-y-auto">
+                      <p
+                        className="text-xs font-bold mb-2"
+                        style={{ color: "#5288c1" }}
+                      >
+                        🎀 All Commands
+                      </p>
+                      <div className="grid grid-cols-1 gap-0.5">
+                        {ALL_COMMANDS.map((c) => (
+                          <button
+                            key={c.cmd}
+                            type="button"
+                            className="text-left px-2 py-1.5 rounded-lg hover:brightness-125 transition-all"
+                            style={{ background: "transparent" }}
+                            onClick={() => {
+                              setInput(`${c.cmd.split(" ")[0]} `);
+                              setShowCommands(false);
+                              inputRef.current?.focus();
+                            }}
+                          >
+                            <span
+                              className="text-xs font-mono font-bold"
+                              style={{ color: "#87CEEB" }}
+                            >
+                              {c.cmd}
+                            </span>
+                            <span
+                              className="text-xs ml-2"
+                              style={{ color: "#8eacbb" }}
+                            >
+                              — {c.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <button
+                type="button"
+                onClick={() => setShowCommands((v) => !v)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all hover:brightness-110"
+                style={{
+                  background: "#1c2f45",
+                  color: "#87CEEB",
+                  border: "1px solid #2b5278",
+                }}
+                data-ocid="chat.commands.toggle"
+              >
+                🎀 Commands
+                <ChevronDown
+                  className="w-3 h-3"
+                  style={{
+                    transform: showCommands ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s",
                   }}
                 />
-              );
-            })
-          : (dmMessages as import("../backend").DMMessage[]).map((msg) => {
-              const isOwn =
-                myPrincipal &&
-                msg.fromUser.toString() === myPrincipal.toString();
-              return (
-                <MessageBubble
-                  key={msg.timestamp.toString() + msg.fromUser.toString()}
-                  content={msg.content}
-                  senderName={isOwn ? "You" : (chatTitle ?? "")}
-                  timestamp={msg.timestamp}
-                  isOwn={!!isOwn}
-                  isGroup={false}
-                  mentionsMe={false}
-                  myUsername={myUsername}
-                />
-              );
-            })}
-        <div ref={bottomRef} />
-      </div>
+              </button>
+            </div>
+          )}
 
-      {/* Command hints chip + popup */}
-      {isGroup && identity && (
-        <div className="px-3 pb-1 flex-shrink-0 relative">
-          <AnimatePresence>
-            {showCommands && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="absolute bottom-full left-3 right-3 mb-2 rounded-xl overflow-hidden z-50"
-                style={{ background: "#1c2733", border: "1px solid #2b3d54" }}
-                data-ocid="chat.commands.popover"
-              >
-                <div className="p-3 max-h-64 overflow-y-auto">
-                  <p
-                    className="text-xs font-bold mb-2"
-                    style={{ color: "#5288c1" }}
-                  >
-                    🎀 All Commands
-                  </p>
-                  <div className="grid grid-cols-1 gap-0.5">
-                    {ALL_COMMANDS.map((c) => (
-                      <button
-                        key={c.cmd}
-                        type="button"
-                        className="text-left px-2 py-1.5 rounded-lg hover:brightness-125 transition-all"
-                        style={{ background: "transparent" }}
-                        onClick={() => {
-                          setInput(`${c.cmd.split(" ")[0]} `);
-                          setShowCommands(false);
-                          inputRef.current?.focus();
-                        }}
-                      >
-                        <span
-                          className="text-xs font-mono font-bold"
-                          style={{ color: "#87CEEB" }}
-                        >
-                          {c.cmd}
-                        </span>
-                        <span
-                          className="text-xs ml-2"
-                          style={{ color: "#8eacbb" }}
-                        >
-                          — {c.desc}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <button
-            type="button"
-            onClick={() => setShowCommands((v) => !v)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all hover:brightness-110"
-            style={{
-              background: "#1c2f45",
-              color: "#87CEEB",
-              border: "1px solid #2b5278",
-            }}
-            data-ocid="chat.commands.toggle"
+          {/* Input bar */}
+          <div
+            className="flex items-center gap-2 px-3 py-3 flex-shrink-0 relative"
+            style={{ background: "#17212b", borderTop: "1px solid #1c2733" }}
           >
-            🎀 Commands
-            <ChevronDown
-              className="w-3 h-3"
-              style={{
-                transform: showCommands ? "rotate(180deg)" : "none",
-                transition: "transform 0.2s",
-              }}
-            />
-          </button>
-        </div>
-      )}
-
-      {/* Input bar */}
-      <div
-        className="flex items-center gap-2 px-3 py-3 flex-shrink-0 relative"
-        style={{ background: "#17212b", borderTop: "1px solid #1c2733" }}
-      >
-        {/* @mention dropdown */}
-        <AnimatePresence>
-          {mentionDropdown && filteredMentions.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="absolute bottom-full left-3 right-14 mb-2 rounded-xl overflow-hidden z-50"
-              style={{ background: "#1c2733", border: "1px solid #2b5278" }}
-              data-ocid="chat.mention.popover"
-            >
-              {filteredMentions.slice(0, 6).map((u) => (
-                <button
-                  key={u}
-                  type="button"
-                  onClick={() => handleMentionSelect(u)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:brightness-125"
-                  style={{ background: "transparent" }}
+            {/* @mention dropdown */}
+            <AnimatePresence>
+              {mentionDropdown && filteredMentions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="absolute bottom-full left-3 right-14 mb-2 rounded-xl overflow-hidden z-50"
+                  style={{ background: "#1c2733", border: "1px solid #2b5278" }}
+                  data-ocid="chat.mention.popover"
                 >
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                    style={{ background: stringToColor(u) }}
-                  >
-                    {u[0]?.toUpperCase()}
-                  </div>
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: "#5288c1" }}
-                  >
-                    @{u}
-                  </span>
+                  {filteredMentions.slice(0, 6).map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => handleMentionSelect(u)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:brightness-125"
+                      style={{ background: "transparent" }}
+                    >
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                        style={{ background: stringToColor(u) }}
+                      >
+                        {u[0]?.toUpperCase()}
+                      </div>
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: "#5288c1" }}
+                      >
+                        @{u}
+                      </span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {/* Media button */}
+              <button
+                type="button"
+                onClick={handleMediaClick}
+                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:brightness-125"
+                style={{ background: "#1c2733", color: "#8eacbb" }}
+                data-ocid="chat.upload_button"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+
+              {/* Text input */}
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder={
+                  isGroup ? PLACEHOLDER_HINTS[placeholderIdx] : "Message..."
+                }
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+                style={{
+                  background: "#182533",
+                  color: "#e8f4fd",
+                  border: "1px solid #2b3d54",
+                }}
+                data-ocid="chat.message.input"
+              />
+
+              {/* Mic or Send button */}
+              {input.trim() ? (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={sendGroupMsg.isPending || sendDMMsg.isPending}
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:brightness-110 disabled:opacity-40 flex-shrink-0"
+                  style={{ background: "#5288c1" }}
+                  data-ocid="chat.send.button"
+                >
+                  <Send className="w-4 h-4 text-white" />
                 </button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <>
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-
-          {/* Media button */}
-          <button
-            type="button"
-            onClick={handleMediaClick}
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:brightness-125"
-            style={{ background: "#1c2733", color: "#8eacbb" }}
-            data-ocid="chat.upload_button"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
-
-          {/* Text input */}
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder={
-              isGroup ? PLACEHOLDER_HINTS[placeholderIdx] : "Message..."
-            }
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
-            style={{
-              background: "#182533",
-              color: "#e8f4fd",
-              border: "1px solid #2b3d54",
-            }}
-            data-ocid="chat.message.input"
-          />
-
-          {/* Mic or Send button */}
-          {input.trim() ? (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={sendGroupMsg.isPending || sendDMMsg.isPending}
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:brightness-110 disabled:opacity-40 flex-shrink-0"
-              style={{ background: "#5288c1" }}
-              data-ocid="chat.send.button"
-            >
-              <Send className="w-4 h-4 text-white" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleMicClick}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-                isRecording ? "animate-pulse" : "hover:brightness-125"
-              }`}
-              style={{
-                background: isRecording ? "#c15252" : "#1c2733",
-                color: isRecording ? "#ffffff" : "#8eacbb",
-              }}
-              data-ocid="chat.toggle"
-            >
-              <Mic className="w-4 h-4" />
-            </button>
-          )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleMicClick}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+                    isRecording ? "animate-pulse" : "hover:brightness-125"
+                  }`}
+                  style={{
+                    background: isRecording ? "#c15252" : "#1c2733",
+                    color: isRecording ? "#ffffff" : "#8eacbb",
+                  }}
+                  data-ocid="chat.toggle"
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          </div>
         </>
-      </div>
+      )}
 
       {/* Group Info Panel */}
       {isGroup && groupName && (
