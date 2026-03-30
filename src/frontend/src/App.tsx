@@ -7,6 +7,7 @@ import GoogleLoginModal from "./components/GoogleLoginModal";
 import TelegramProfile from "./components/TelegramProfile";
 import { useGoogleAuth } from "./hooks/useGoogleAuth";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { useAds } from "./hooks/useQueries";
 import Admin from "./pages/Admin";
 import CheckPage from "./pages/CheckPage";
 import CouponPage from "./pages/CouponPage";
@@ -292,6 +293,18 @@ export default function App() {
   };
   const { identity, isInitializing, login } = useInternetIdentity();
   const googleAuth = useGoogleAuth();
+  const { data: ads = [] } = useAds();
+  const [adsEnabledState] = useState(
+    () => localStorage.getItem("sinzhu_ads_enabled") !== "false",
+  );
+  const [adPopupDismissed, setAdPopupDismissed] = useState(() => {
+    return sessionStorage.getItem("sinzhu_ad_popup_shown") === "true";
+  });
+  const showAdPopup = adsEnabledState && !adPopupDismissed && ads.length > 0;
+  const handleDismissAd = () => {
+    sessionStorage.setItem("sinzhu_ad_popup_shown", "true");
+    setAdPopupDismissed(true);
+  };
   const [activeView, setActiveView] = useState<ChatView>({ type: "welcome" });
   const [showSidebar, setShowSidebar] = useState(true);
 
@@ -548,6 +561,49 @@ export default function App() {
           },
         }}
       />
+      {showAdPopup && (
+        <div
+          className="fixed inset-0 z-[9990] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.75)" }}
+          onClick={handleDismissAd}
+          onKeyDown={(e) => e.key === "Escape" && handleDismissAd()}
+          tabIndex={-1}
+        >
+          <div
+            className="relative max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
+          >
+            <button
+              type="button"
+              onClick={handleDismissAd}
+              className="absolute -top-3 -right-3 z-10 w-7 h-7 rounded-full flex items-center justify-center font-bold text-white shadow-lg"
+              style={{ background: "#e05555", fontSize: 16 }}
+              aria-label="Close ad"
+            >
+              ✕
+            </button>
+            {ads[0].link ? (
+              <a href={ads[0].link} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={ads[0].imageUrl}
+                  alt={ads[0].title || "Ad"}
+                  className="w-full rounded-xl object-cover"
+                  style={{ maxHeight: 400 }}
+                />
+              </a>
+            ) : (
+              <img
+                src={ads[0].imageUrl}
+                alt={ads[0].title || "Ad"}
+                className="w-full rounded-xl object-cover"
+                style={{ maxHeight: 400 }}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1520,9 +1520,7 @@ export default function ChatWindow({
   const [spawnedWaifu, setSpawnedWaifu] = useState<WaifuCharacter | null>(null);
   const [localHaremIds, setLocalHaremIds] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem(
-        `sinzhu_local_harem_${isGroup ? activeView.groupName : "dm"}`,
-      );
+      const stored = localStorage.getItem("sinzhu_harem_global");
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -1985,7 +1983,7 @@ export default function ChatWindow({
                 const updated = [...prev, caught.id];
                 try {
                   localStorage.setItem(
-                    `sinzhu_local_harem_${groupName}`,
+                    "sinzhu_harem_global",
                     JSON.stringify(updated),
                   );
                 } catch {}
@@ -2831,7 +2829,7 @@ export default function ChatWindow({
                               );
                               setLocalHaremIds(newIds);
                               localStorage.setItem(
-                                `sinzhu_local_harem_${groupName}`,
+                                "sinzhu_harem_global",
                                 JSON.stringify(newIds),
                               );
                               toast.success("Waifu sold! 💸");

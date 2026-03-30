@@ -46,6 +46,19 @@ export default function Admin({ onNavigate }: AdminProps) {
 
   const queryClient = useQueryClient();
   const [unlocked, setUnlocked] = useState(false);
+  const [adsEnabled, setAdsEnabled] = useState(() => {
+    return localStorage.getItem("sinzhu_ads_enabled") !== "false";
+  });
+  const handleToggleAds = () => {
+    const newVal = !adsEnabled;
+    setAdsEnabled(newVal);
+    localStorage.setItem("sinzhu_ads_enabled", String(newVal));
+    toast.success(
+      newVal
+        ? "Ads enabled! Popup will show on app open."
+        : "Ads stopped! Popup won't show.",
+    );
+  };
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -674,9 +687,25 @@ export default function Admin({ onNavigate }: AdminProps) {
             </div>
 
             <div className="card-glass rounded-2xl p-6">
-              <h3 className="font-bold text-lg mb-4">
-                Active Ads ({(ads ?? []).length})
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg">
+                  Active Ads ({(ads ?? []).length})
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleToggleAds}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                  style={{
+                    background: adsEnabled ? "#1a3a1a" : "#3a1c1c",
+                    color: adsEnabled ? "#4caf50" : "#e05555",
+                    border: `1px solid ${adsEnabled ? "#4caf50" : "#e05555"}`,
+                  }}
+                  data-ocid="admin.ads.toggle_button"
+                >
+                  {adsEnabled ? "🟢 Ads ON" : "🔴 Ads OFF"}
+                  <span className="text-xs opacity-70">(Tap to toggle)</span>
+                </button>
+              </div>
               <div className="space-y-2">
                 {(ads ?? []).map((ad, i) => (
                   <div

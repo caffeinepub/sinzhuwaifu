@@ -45,12 +45,16 @@ export default function Harem({ onNavigate }: HaremProps) {
   const [filter, setFilter] = useState<string>("all");
   const [localHarem, setLocalHarem] = useState<
     { id: string; isFavorite: boolean }[]
-  >([
-    { id: "waifu-001", isFavorite: true },
-    { id: "waifu-002", isFavorite: false },
-    { id: "waifu-004", isFavorite: false },
-    { id: "waifu-005", isFavorite: true },
-  ]);
+  >(() => {
+    try {
+      const stored = localStorage.getItem("sinzhu_harem_global");
+      if (stored) {
+        const ids: string[] = JSON.parse(stored);
+        return ids.map((id) => ({ id, isFavorite: false }));
+      }
+    } catch {}
+    return [];
+  });
 
   const allCharacters: WaifuCharacter[] =
     characters && characters.length > 0 ? characters : SEED_WAIFUS;
@@ -86,7 +90,16 @@ export default function Harem({ onNavigate }: HaremProps) {
     const char = allCharacters.find((c) => c.id === characterId);
     if (!char) return;
     const sellPrice = RARITY_SELL_PRICES[char.rarity] ?? 10;
-    setLocalHarem((prev) => prev.filter((h) => h.id !== characterId));
+    setLocalHarem((prev) => {
+      const updated = prev.filter((h) => h.id !== characterId);
+      try {
+        localStorage.setItem(
+          "sinzhu_harem_global",
+          JSON.stringify(updated.map((h) => h.id)),
+        );
+      } catch {}
+      return updated;
+    });
     if (profile) {
       try {
         await saveProfile.mutateAsync({
