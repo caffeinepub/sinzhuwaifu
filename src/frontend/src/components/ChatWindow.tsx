@@ -1507,6 +1507,14 @@ export default function ChatWindow({
   const addWaifuToHarem = useAddWaifuToHarem();
 
   const [input, setInput] = useState("");
+  const [editingBotMsgId, setEditingBotMsgId] = useState<string | null>(null);
+  const [editingBotMsgText, setEditingBotMsgText] = useState("");
+  const [localDeletedMsgIds, setLocalDeletedMsgIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [localEditedMsgs, setLocalEditedMsgs] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [showInfo, setShowInfo] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
   const [spawnedWaifu, setSpawnedWaifu] = useState<WaifuCharacter | null>(null);
@@ -2867,11 +2875,53 @@ export default function ChatWindow({
             {isGroup
               ? mergedMessages.map((item, i) => {
                   if (item._type === "bot") {
+                    const isOwnBotMsg =
+                      item.msg.isUserMessage && item.msg.isOwn;
                     return (
                       <BotMessageBubble
                         key={item.msg.id}
                         message={item.msg}
                         isWaifuSpawnCard={!!item.msg.isWaifuSpawnCard}
+                        onEdit={
+                          isOwnBotMsg
+                            ? () => {
+                                setEditingBotMsgId(item.msg.id);
+                                setEditingBotMsgText(item.msg.content);
+                              }
+                            : undefined
+                        }
+                        onDelete={
+                          isOwnBotMsg
+                            ? () => {
+                                setBotMessages((prev) =>
+                                  prev.filter((m) => m.id !== item.msg.id),
+                                );
+                              }
+                            : undefined
+                        }
+                        isEditing={editingBotMsgId === item.msg.id}
+                        editText={
+                          editingBotMsgId === item.msg.id
+                            ? editingBotMsgText
+                            : undefined
+                        }
+                        onEditChange={
+                          isOwnBotMsg ? setEditingBotMsgText : undefined
+                        }
+                        onEditSave={
+                          isOwnBotMsg
+                            ? () => {
+                                setBotMessages((prev) =>
+                                  prev.map((m) =>
+                                    m.id === editingBotMsgId
+                                      ? { ...m, content: editingBotMsgText }
+                                      : m,
+                                  ),
+                                );
+                                setEditingBotMsgId(null);
+                              }
+                            : undefined
+                        }
                       />
                     );
                   }
@@ -2909,10 +2959,15 @@ export default function ChatWindow({
                   const mentionsMe = myUsername
                     ? new RegExp(`@${myUsername}\\b`, "i").test(msg.content)
                     : false;
+                  const msgId = (msg.id ?? i).toString();
+                  if (localDeletedMsgIds.has(msgId)) return null;
+                  const editedContent =
+                    localEditedMsgs.get(msgId) ?? msg.content;
+                  const isEditingThis = editingBotMsgId === msgId;
                   return (
                     <MessageBubble
                       key={msg.id ?? i}
-                      content={msg.content}
+                      content={editedContent}
                       senderName={msg.senderName || "Unknown"}
                       timestamp={msg.timestamp}
                       isOwn={!!isOwn}
@@ -2926,6 +2981,40 @@ export default function ChatWindow({
                             msg.senderName || "Unknown",
                           );
                       }}
+                      onEdit={
+                        isOwn
+                          ? () => {
+                              setEditingBotMsgId(msgId);
+                              setEditingBotMsgText(editedContent);
+                            }
+                          : undefined
+                      }
+                      onDelete={
+                        isOwn
+                          ? () => {
+                              setLocalDeletedMsgIds(
+                                (prev) => new Set([...prev, msgId]),
+                              );
+                            }
+                          : undefined
+                      }
+                      isEditing={isEditingThis}
+                      editText={isEditingThis ? editingBotMsgText : undefined}
+                      onEditChange={isOwn ? setEditingBotMsgText : undefined}
+                      onEditSave={
+                        isOwn
+                          ? () => {
+                              setLocalEditedMsgs(
+                                (prev) =>
+                                  new Map([
+                                    ...prev,
+                                    [msgId, editingBotMsgText],
+                                  ]),
+                              );
+                              setEditingBotMsgId(null);
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })
@@ -2933,16 +3022,56 @@ export default function ChatWindow({
                   const isOwn =
                     myPrincipal &&
                     msg.fromUser.toString() === myPrincipal.toString();
+                  const dmMsgId =
+                    msg.timestamp.toString() + msg.fromUser.toString();
+                  if (localDeletedMsgIds.has(dmMsgId)) return null;
+                  const dmEditedContent =
+                    localEditedMsgs.get(dmMsgId) ?? msg.content;
+                  const isDMEditingThis = editingBotMsgId === dmMsgId;
                   return (
                     <MessageBubble
-                      key={msg.timestamp.toString() + msg.fromUser.toString()}
-                      content={msg.content}
+                      key={dmMsgId}
+                      content={dmEditedContent}
                       senderName={isOwn ? "You" : (chatTitle ?? "")}
                       timestamp={msg.timestamp}
                       isOwn={!!isOwn}
                       isGroup={false}
                       mentionsMe={false}
                       myUsername={myUsername}
+                      onEdit={
+                        isOwn
+                          ? () => {
+                              setEditingBotMsgId(dmMsgId);
+                              setEditingBotMsgText(dmEditedContent);
+                            }
+                          : undefined
+                      }
+                      onDelete={
+                        isOwn
+                          ? () => {
+                              setLocalDeletedMsgIds(
+                                (prev) => new Set([...prev, dmMsgId]),
+                              );
+                            }
+                          : undefined
+                      }
+                      isEditing={isDMEditingThis}
+                      editText={isDMEditingThis ? editingBotMsgText : undefined}
+                      onEditChange={isOwn ? setEditingBotMsgText : undefined}
+                      onEditSave={
+                        isOwn
+                          ? () => {
+                              setLocalEditedMsgs(
+                                (prev) =>
+                                  new Map([
+                                    ...prev,
+                                    [dmMsgId, editingBotMsgText],
+                                  ]),
+                              );
+                              setEditingBotMsgId(null);
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -3157,22 +3286,60 @@ export default function ChatWindow({
 function BotMessageBubble({
   message,
   isWaifuSpawnCard,
+  onEdit,
+  onDelete,
+  isEditing,
+  editText,
+  onEditChange,
+  onEditSave,
 }: {
   message: BotMessage;
   isWaifuSpawnCard: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isEditing?: boolean;
+  editText?: string;
+  onEditChange?: (v: string) => void;
+  onEditSave?: () => void;
 }) {
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tapped, setTapped] = useState(false);
+
+  const handleTap = (isOwn: boolean, isVoiceOrMedia: boolean) => {
+    if (!isOwn) return;
+    tapCountRef.current += 1;
+    setTapped(true);
+    setTimeout(() => setTapped(false), 200);
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      const count = tapCountRef.current;
+      tapCountRef.current = 0;
+      if (count >= 3 && onDelete) onDelete();
+      else if (count === 2 && !isVoiceOrMedia && onEdit) onEdit();
+    }, 350);
+  };
+
   // Render user-sent messages (text, media, voice) as proper chat bubbles
   if (message.isUserMessage) {
     const isOwn = message.isOwn;
+    const isVoiceOrMedia = message.mediaType === "voice" || !!message.mediaUrl;
     return (
       <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-1`}>
         <div
-          className="max-w-xs md:max-w-sm lg:max-w-md px-3 py-2 rounded-xl"
+          className="max-w-xs md:max-w-sm lg:max-w-md px-3 py-2 rounded-xl transition-all duration-150"
           style={{
-            background: isOwn ? "#2b5278" : "#182533",
+            background:
+              tapped && isOwn ? "#3a6a9a" : isOwn ? "#2b5278" : "#182533",
             borderRadius: isOwn ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+            cursor: isOwn ? "pointer" : "default",
+            userSelect: "none",
           }}
           data-ocid="chat.message.item"
+          onClick={() => handleTap(!!isOwn, isVoiceOrMedia)}
+          onKeyDown={(e) =>
+            e.key === "Enter" && handleTap(!!isOwn, isVoiceOrMedia)
+          }
         >
           {!isOwn && message.senderName && (
             <p
@@ -3209,12 +3376,41 @@ function BotMessageBubble({
                 Voice
               </span>
             </div>
+          ) : isEditing ? (
+            <input
+              className="text-sm w-full rounded px-2 py-1 outline-none"
+              style={{
+                background: "#0e1f30",
+                color: "#e8f4fd",
+                border: "1px solid #5288c1",
+              }}
+              value={editText ?? ""}
+              onChange={(e) => onEditChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onEditSave?.();
+                }
+                if (e.key === "Escape") {
+                  onEditChange?.(message.content);
+                  onEditSave?.();
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
           ) : (
             message.content && (
               <p className="text-sm break-words" style={{ color: "#e8f4fd" }}>
                 {message.content}
               </p>
             )
+          )}
+          {isOwn && !isEditing && (
+            <p
+              className="text-right text-xs mt-0.5 opacity-50"
+              style={{ color: "#87CEEB", fontSize: "9px" }}
+            >
+              2x edit · 3x delete
+            </p>
           )}
           <p
             className="text-right text-xs mt-0.5"
@@ -3311,6 +3507,12 @@ function MessageBubble({
   mentionsMe,
   myUsername,
   onRendered,
+  onEdit,
+  onDelete,
+  isEditing,
+  editText,
+  onEditChange,
+  onEditSave,
 }: {
   content: string;
   senderName: string;
@@ -3320,8 +3522,13 @@ function MessageBubble({
   mentionsMe: boolean;
   myUsername: string;
   onRendered?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isEditing?: boolean;
+  editText?: string;
+  onEditChange?: (v: string) => void;
+  onEditSave?: () => void;
 }) {
-  // Call onRendered once on mount to trigger notification logic
   const renderedRef = useRef(false);
   useEffect(() => {
     if (!renderedRef.current && onRendered) {
@@ -3330,16 +3537,45 @@ function MessageBubble({
     }
   }, [onRendered]);
 
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tapped, setTapped] = useState(false);
+
+  const handleTap = () => {
+    if (!isOwn) return;
+    tapCountRef.current += 1;
+    setTapped(true);
+    setTimeout(() => setTapped(false), 200);
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      const count = tapCountRef.current;
+      tapCountRef.current = 0;
+      if (count >= 3 && onDelete) onDelete();
+      else if (count === 2 && onEdit) onEdit();
+    }, 350);
+  };
+
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-1`}>
       <div
-        className="max-w-xs md:max-w-sm lg:max-w-md px-3 py-2 rounded-xl"
+        className="max-w-xs md:max-w-sm lg:max-w-md px-3 py-2 rounded-xl transition-all duration-150"
         style={{
-          background: mentionsMe ? "#2b3a1a" : isOwn ? "#2b5278" : "#182533",
+          background:
+            tapped && isOwn
+              ? "#3a6a9a"
+              : mentionsMe
+                ? "#2b3a1a"
+                : isOwn
+                  ? "#2b5278"
+                  : "#182533",
           borderRadius: isOwn ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
           border: mentionsMe ? "1px solid #ffd700" : "none",
+          cursor: isOwn ? "pointer" : "default",
+          userSelect: "none",
         }}
         data-ocid="chat.message.item"
+        onClick={handleTap}
+        onKeyDown={(e) => e.key === "Enter" && handleTap()}
       >
         {isGroup && !isOwn && (
           <p
@@ -3349,9 +3585,40 @@ function MessageBubble({
             {senderName}
           </p>
         )}
-        <p className="text-sm break-words" style={{ color: "#e8f4fd" }}>
-          {renderMessageWithMentions(content, myUsername)}
-        </p>
+        {isEditing ? (
+          <input
+            className="text-sm w-full rounded px-2 py-1 outline-none"
+            style={{
+              background: "#0e1f30",
+              color: "#e8f4fd",
+              border: "1px solid #5288c1",
+            }}
+            value={editText ?? ""}
+            onChange={(e) => onEditChange?.(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onEditSave?.();
+              }
+              if (e.key === "Escape") {
+                onEditChange?.(content);
+                onEditSave?.();
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <p className="text-sm break-words" style={{ color: "#e8f4fd" }}>
+            {renderMessageWithMentions(content, myUsername)}
+          </p>
+        )}
+        {isOwn && !isEditing && (
+          <p
+            className="text-right opacity-40"
+            style={{ color: "#87CEEB", fontSize: "9px" }}
+          >
+            2x edit · 3x delete
+          </p>
+        )}
         <p
           className="text-right text-xs mt-0.5"
           style={{ color: isOwn ? "#87CEEB" : "#4a6278" }}
