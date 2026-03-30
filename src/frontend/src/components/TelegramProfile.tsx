@@ -59,6 +59,25 @@ function GoogleColorIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+function getLocalProfile() {
+  try {
+    return JSON.parse(localStorage.getItem("sinzhu_profile") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalProfile(data: Record<string, string>) {
+  try {
+    const existing = getLocalProfile() || {};
+    const merged = { ...existing, ...data };
+    localStorage.setItem("sinzhu_profile", JSON.stringify(merged));
+    return merged;
+  } catch {
+    return data;
+  }
+}
+
 export default function TelegramProfile({
   onBack,
   onNavigate,
@@ -81,71 +100,48 @@ export default function TelegramProfile({
   const [copiedPrincipal, setCopiedPrincipal] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
+  // localPic tracks uploaded photo immediately in state (for instant UI update)
+  const [localPic, setLocalPic] = useState<string>(
+    () => getLocalProfile()?.picture || "",
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isGoogleUser = !!googleAuth.user && !identity;
+  const isGoogleUser = !!googleAuth.user;
   const isLoggedIn = !!identity || !!googleAuth.user;
 
-  // Initialize form from backend profile (Internet Identity users)
-  // Prefer localStorage values over backend when they exist
+  // Initialize form
   useEffect(() => {
-    if (profile && identity) {
-      const local = (() => {
-        try {
-          return JSON.parse(localStorage.getItem("sinzhu_profile") || "null");
-        } catch {
-          return null;
-        }
-      })();
+    const local = getLocalProfile();
+    if (identity && profile) {
       setForm({
         username: local?.username ?? profile.username,
         displayName: local?.displayName ?? profile.displayName,
         bio: local?.bio ?? profile.bio,
       });
-    }
-  }, [profile, identity]);
-
-  // Initialize form from localStorage (Google users)
-  useEffect(() => {
-    if (googleAuth.user && !identity) {
-      try {
-        const local = JSON.parse(
-          localStorage.getItem("sinzhu_profile") || "null",
-        );
-        if (local) {
-          setForm({
-            username: local.username || "",
-            displayName: local.displayName || googleAuth.user.name,
-            bio: local.bio || "",
-          });
-        } else {
-          setForm({
-            username: googleAuth.user.email.split("@")[0],
-            displayName: googleAuth.user.name,
-            bio: "",
-          });
-        }
-      } catch {
-        setForm({
-          username: googleAuth.user.email.split("@")[0],
-          displayName: googleAuth.user.name,
-          bio: "",
-        });
+      if (local?.picture) setLocalPic(local.picture);
+    } else if (googleAuth.user) {
+      setForm({
+        username: local?.username || googleAuth.user.email.split("@")[0],
+        displayName: local?.displayName || googleAuth.user.name,
+        bio: local?.bio || "",
+      });
+      if (local?.picture) {
+        setLocalPic(local.picture);
+      } else {
+        setLocalPic(googleAuth.user.picture || "");
       }
     }
-  }, [googleAuth.user, identity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, identity, googleAuth.user]);
 
   const principalStr = identity?.getPrincipal().toString() ?? "";
 
   const handleSave = async () => {
-    // Always save to localStorage
-    const saved = {
+    saveLocalProfile({
       username: form.username,
       displayName: form.displayName,
       bio: form.bio,
-    };
-    localStorage.setItem("sinzhu_profile", JSON.stringify(saved));
-    // Only call backend if Internet Identity
+    });
     if (profile && identity) {
       try {
         await saveProfile.mutateAsync({
@@ -155,7 +151,7 @@ export default function TelegramProfile({
           bio: form.bio,
         });
       } catch {
-        // localStorage save already happened, so we just show success
+        // localStorage already saved
       }
     }
     toast.success("Profile updated! ✨");
@@ -166,29 +162,21 @@ export default function TelegramProfile({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Google user: save as base64 in localStorage
-    if (isGoogleUser && !identity) {
+    // For Google users or when no backend profile — save as base64 in localStorage
+    if (!identity || !profile) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         const base64 = ev.target?.result as string;
-        try {
-          const existing = JSON.parse(
-            localStorage.getItem("sinzhu_profile") || "{}",
-          );
-          existing.picture = base64;
-          localStorage.setItem("sinzhu_profile", JSON.stringify(existing));
-          // Force re-render
-          setForm((f) => ({ ...f }));
-          toast.success("Photo updated! 📸");
-        } catch {}
+        saveLocalProfile({ picture: base64 });
+        setLocalPic(base64);
+        toast.success("Photo updated! 📸");
       };
       reader.readAsDataURL(file);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
-    // Internet Identity user: use backend blob upload
-    if (!profile) return;
+    // Internet Identity user with backend profile
     try {
       setUploadProgress(0);
       const arrayBuffer = await file.arrayBuffer();
@@ -200,26 +188,39 @@ export default function TelegramProfile({
       toast.success("Photo updated! 📸");
       queryClient.invalidateQueries({ queryKey: ["callerProfile"] });
     } catch {
+      // fallback to localStorage base64
       setUploadProgress(null);
-      toast.error("Upload failed.");
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        saveLocalProfile({ picture: base64 });
+        setLocalPic(base64);
+        toast.success("Photo updated! 📸");
+      };
+      reader.readAsDataURL(file);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDeletePhoto = async () => {
-    if (!profile) return;
-    setDeletingPhoto(true);
-    try {
-      await saveProfile.mutateAsync({
-        ...profile,
-        profilePic: ExternalBlob.fromURL(""),
-      });
-      toast.success("Photo removed.");
-      queryClient.invalidateQueries({ queryKey: ["callerProfile"] });
-    } catch {
-      toast.error("Failed to remove photo.");
+    // Remove from localStorage for all users
+    saveLocalProfile({ picture: "" });
+    setLocalPic("");
+
+    if (profile && identity) {
+      setDeletingPhoto(true);
+      try {
+        await saveProfile.mutateAsync({
+          ...profile,
+          profilePic: ExternalBlob.fromURL(""),
+        });
+        queryClient.invalidateQueries({ queryKey: ["callerProfile"] });
+      } catch {
+        // localStorage already cleared
+      }
+      setDeletingPhoto(false);
     }
-    setDeletingPhoto(false);
+    toast.success("Photo removed.");
   };
 
   const handleCopyPrincipal = () => {
@@ -230,28 +231,15 @@ export default function TelegramProfile({
     toast.success("Principal ID copied!");
   };
 
-  let picUrl = "";
-  if (isGoogleUser) {
-    // Check localStorage for custom uploaded photo first
+  // Compute pic URL: prefer localPic (uploaded/from localStorage), then backend, then Google avatar
+  let picUrl = localPic;
+  if (!picUrl && identity && profile) {
     try {
-      const local = JSON.parse(
-        localStorage.getItem("sinzhu_profile") || "null",
-      );
-      picUrl = local?.picture || googleAuth.user?.picture || "";
-    } catch {
-      picUrl = googleAuth.user?.picture || "";
-    }
-  } else {
-    try {
-      picUrl = profile?.profilePic?.getDirectURL?.() || "";
+      picUrl = profile.profilePic?.getDirectURL?.() || "";
     } catch {}
   }
 
-  const displayName =
-    form.displayName ||
-    form.username ||
-    (isGoogleUser ? googleAuth.user?.name : "User") ||
-    "User";
+  const displayName = form.displayName || form.username || "User";
   const avatarLetter = displayName[0]?.toUpperCase() ?? "U";
   const coins = profile ? Number(profile.balance) : 0;
 
@@ -268,7 +256,7 @@ export default function TelegramProfile({
         <button
           type="button"
           onClick={onBack}
-          className="md:hidden w-8 h-8 flex items-center justify-center rounded-full"
+          className="w-8 h-8 flex items-center justify-center rounded-full"
           style={{ color: "#5288c1" }}
           data-ocid="profile.back.button"
         >
@@ -287,16 +275,26 @@ export default function TelegramProfile({
           </button>
         )}
         {editing && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saveProfile.isPending}
-            className="w-8 h-8 flex items-center justify-center rounded-full"
-            style={{ color: "#3b9e5a" }}
-            data-ocid="profile.save.button"
-          >
-            <Save className="w-4 h-4" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="px-3 py-1 rounded-lg text-xs"
+              style={{ color: "#8eacbb" }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saveProfile.isPending}
+              className="w-8 h-8 flex items-center justify-center rounded-full"
+              style={{ color: "#3b9e5a" }}
+              data-ocid="profile.save.button"
+            >
+              <Save className="w-4 h-4" />
+            </button>
+          </>
         )}
       </div>
 
@@ -316,7 +314,6 @@ export default function TelegramProfile({
             </p>
           </div>
 
-          {/* Google login button */}
           <button
             type="button"
             onClick={() => setShowGoogleModal(true)}
@@ -333,7 +330,6 @@ export default function TelegramProfile({
             Continue with Google
           </button>
 
-          {/* Divider */}
           <div
             className="flex items-center gap-3 w-full"
             style={{ maxWidth: 300 }}
@@ -345,7 +341,6 @@ export default function TelegramProfile({
             <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
           </div>
 
-          {/* Internet Identity login */}
           <button
             type="button"
             onClick={login}
@@ -379,32 +374,33 @@ export default function TelegramProfile({
                 avatarLetter
               )}
             </div>
-            {/* Show upload/delete for all logged-in users */}
-            {isLoggedIn && (
-              <div className="absolute -bottom-1 right-0 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "#5288c1" }}
-                  data-ocid="profile.photo.upload_button"
-                >
-                  <Camera className="w-4 h-4 text-white" />
-                </button>
-                {picUrl && identity && (
-                  <button
-                    type="button"
-                    onClick={handleDeletePhoto}
-                    disabled={deletingPhoto}
-                    className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ background: "#c15252" }}
-                    data-ocid="profile.photo.delete_button"
-                  >
-                    <Trash2 className="w-4 h-4 text-white" />
-                  </button>
-                )}
-              </div>
+
+            {/* Camera upload button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-1 right-0 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "#5288c1" }}
+              data-ocid="profile.photo.upload_button"
+              disabled={uploadProgress !== null}
+            >
+              <Camera className="w-4 h-4 text-white" />
+            </button>
+
+            {/* Delete photo button — shown for all users when photo exists */}
+            {picUrl && (
+              <button
+                type="button"
+                onClick={handleDeletePhoto}
+                disabled={deletingPhoto}
+                className="absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center"
+                style={{ background: "#c15252" }}
+                data-ocid="profile.photo.delete_button"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-white" />
+              </button>
             )}
+
             <input
               ref={fileInputRef}
               type="file"
@@ -479,14 +475,15 @@ export default function TelegramProfile({
                     }
                     className="w-full bg-transparent text-sm font-semibold outline-none mt-0.5"
                     style={{ color: "#e8f4fd" }}
+                    placeholder="Enter your name"
                     data-ocid="profile.name.input"
                   />
                 ) : (
                   <p
                     className="text-sm font-semibold"
-                    style={{ color: "#e8f4fd" }}
+                    style={{ color: form.displayName ? "#e8f4fd" : "#4a6278" }}
                   >
-                    {form.displayName || "—"}
+                    {form.displayName || "Tap edit to set name"}
                   </p>
                 )}
               </div>
@@ -506,6 +503,7 @@ export default function TelegramProfile({
                     }
                     className="w-full bg-transparent text-sm outline-none mt-0.5"
                     style={{ color: "#e8f4fd" }}
+                    placeholder="username (no spaces)"
                     data-ocid="profile.username.input"
                   />
                 ) : (
@@ -513,7 +511,7 @@ export default function TelegramProfile({
                     className="text-sm"
                     style={{ color: form.username ? "#5288c1" : "#4a6278" }}
                   >
-                    {form.username ? `@${form.username}` : "—"}
+                    {form.username ? `@${form.username}` : "Not set"}
                   </p>
                 )}
               </div>
@@ -530,6 +528,7 @@ export default function TelegramProfile({
                     className="w-full bg-transparent text-sm outline-none mt-0.5 resize-none"
                     style={{ color: "#e8f4fd" }}
                     rows={3}
+                    placeholder="Write something about yourself..."
                     data-ocid="profile.bio.textarea"
                   />
                 ) : (
@@ -543,7 +542,20 @@ export default function TelegramProfile({
               </div>
             </div>
 
-            {/* Stats — only show for II users */}
+            {/* Save button when editing (also in header, but easier to see here) */}
+            {editing && (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saveProfile.isPending}
+                className="w-full py-3 rounded-xl font-bold text-sm"
+                style={{ background: "#2481cc", color: "#fff" }}
+              >
+                {saveProfile.isPending ? "Saving..." : "💾 Save Changes"}
+              </button>
+            )}
+
+            {/* Stats */}
             {identity && (
               <div className="grid grid-cols-2 gap-2">
                 <div
@@ -571,7 +583,7 @@ export default function TelegramProfile({
               </div>
             )}
 
-            {/* Google user email info */}
+            {/* Google user email */}
             {isGoogleUser && googleAuth.user && (
               <div
                 className="rounded-xl px-4 py-3"
@@ -586,7 +598,7 @@ export default function TelegramProfile({
               </div>
             )}
 
-            {/* Principal ID — only for II users */}
+            {/* Principal ID */}
             {principalStr && identity && (
               <div
                 className="rounded-xl px-4 py-3 flex items-center gap-3"
@@ -619,13 +631,16 @@ export default function TelegramProfile({
               </div>
             )}
 
-            {/* Friend Requests — only for II users */}
+            {/* Friend Requests */}
             {identity &&
               friendRequests.filter((r) => r.status === "pending").length >
                 0 && (
                 <div
                   className="rounded-xl overflow-hidden"
-                  style={{ background: "#182533", border: "1px solid #2b3d54" }}
+                  style={{
+                    background: "#182533",
+                    border: "1px solid #2b3d54",
+                  }}
                 >
                   <div
                     className="px-4 py-3"
@@ -686,7 +701,10 @@ export default function TelegramProfile({
                 type="button"
                 onClick={() => onNavigate("admin")}
                 className="w-full py-3 rounded-xl font-bold text-white text-sm transition-all hover:brightness-110 flex items-center justify-center gap-2"
-                style={{ background: "#2b3d54", border: "1px solid #3d5a78" }}
+                style={{
+                  background: "#2b3d54",
+                  border: "1px solid #3d5a78",
+                }}
                 data-ocid="profile.admin.button"
               >
                 ⚙️ Admin Panel
@@ -696,7 +714,7 @@ export default function TelegramProfile({
             {/* Logout */}
             <button
               type="button"
-              onClick={isGoogleUser ? googleAuth.logout : clear}
+              onClick={isGoogleUser && !identity ? googleAuth.logout : clear}
               className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:brightness-110"
               style={{
                 background: "rgba(193,82,82,0.15)",
@@ -711,7 +729,7 @@ export default function TelegramProfile({
         </div>
       )}
 
-      {/* Footer attribution */}
+      {/* Footer */}
       <div className="px-4 py-4 text-center">
         <p className="text-xs" style={{ color: "#2b3d54" }}>
           © {new Date().getFullYear()}. Built with ❤️ using{" "}
@@ -726,11 +744,13 @@ export default function TelegramProfile({
         </p>
       </div>
 
-      {/* Google Login Modal */}
       <GoogleLoginModal
         open={showGoogleModal}
         onClose={() => setShowGoogleModal(false)}
-        onSuccess={() => setShowGoogleModal(false)}
+        onSuccess={() => {
+          setShowGoogleModal(false);
+          onBack();
+        }}
       />
     </div>
   );

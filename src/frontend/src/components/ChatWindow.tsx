@@ -2547,6 +2547,7 @@ export default function ChatWindow({
                       `sinzhu_group_photo_${groupName ?? ""}`,
                       url,
                     );
+                    localStorage.setItem(`groupPhoto_${groupName ?? ""}`, url);
                     setGroupPhotoUrl(url);
                     toast.success("Group photo updated!");
                   }

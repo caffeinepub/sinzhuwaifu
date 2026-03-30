@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useQueryClient } from "@tanstack/react-query";
 import { Package, Plus, Shield, Trash2, Upload } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
@@ -43,6 +44,7 @@ export default function Admin({ onNavigate }: AdminProps) {
   const addAd = useAddAd();
   const deleteAd = useDeleteAd();
 
+  const queryClient = useQueryClient();
   const [unlocked, setUnlocked] = useState(false);
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -172,23 +174,29 @@ export default function Admin({ onNavigate }: AdminProps) {
     const existing = JSON.parse(localStorage.getItem("sinzhu_waifus") || "[]");
     existing.push(newWaifu);
     localStorage.setItem("sinzhu_waifus", JSON.stringify(existing));
+    // Immediately refresh UI from localStorage
+    queryClient.invalidateQueries({ queryKey: ["waifuCharacters"] });
     try {
       await addWaifu.mutateAsync(newWaifu);
     } catch {
-      // localStorage already saved - that's our fallback
+      // localStorage already saved and query refreshed
     }
     toast.success(`Waifu "${waifuForm.name}" added! ✅`);
     setWaifuForm({ name: "", series: "", rarity: "common", imageUrl: "" });
   };
 
   const handleDeleteWaifu = async (id: string, name: string) => {
-    // Optimistically remove from UI immediately
+    // Remove from localStorage immediately
+    const existing = JSON.parse(localStorage.getItem("sinzhu_waifus") || "[]");
+    const filtered = existing.filter((w: { id: string }) => w.id !== id);
+    localStorage.setItem("sinzhu_waifus", JSON.stringify(filtered));
     setDeletedIds((prev) => new Set([...prev, id]));
+    queryClient.invalidateQueries({ queryKey: ["waifuCharacters"] });
     toast.success(`"${name}" deleted.`);
     try {
       await deleteWaifu.mutateAsync(id);
     } catch {
-      // backend may fail due to permissions, but UI already updated
+      // localStorage already updated
     }
   };
 

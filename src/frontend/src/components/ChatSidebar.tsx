@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { ChatView, GamePage } from "../App";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useCallerProfile,
@@ -354,8 +355,36 @@ export default function ChatSidebar({
   onOpenProfile,
 }: ChatSidebarProps) {
   const { identity } = useInternetIdentity();
+  const googleAuth = useGoogleAuth();
   const { data: groups = [] } = useGroups();
   const { data: profile } = useCallerProfile();
+  // Load local profile immediately from localStorage, re-read on storage changes
+  const [localProfile, setLocalProfile] = useState<Record<
+    string,
+    string
+  > | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("sinzhu_profile") || "null");
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    const onStorage = () => {
+      try {
+        setLocalProfile(
+          JSON.parse(localStorage.getItem("sinzhu_profile") || "null"),
+        );
+      } catch {}
+    };
+    window.addEventListener("storage", onStorage);
+    // Also poll every 2s for same-tab updates
+    const interval = setInterval(onStorage, 2000);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      clearInterval(interval);
+    };
+  }, []);
   const createGroup = useCreateGroup();
   const joinGroup = useJoinGroup();
 
@@ -380,6 +409,14 @@ export default function ChatSidebar({
   useEffect(() => {
     if (!showCompose) setLocalGroups(loadLocalGroups());
   }, [showCompose]);
+
+  // Reload groups from localStorage on app open / storage change
+  useEffect(() => {
+    setLocalGroups(loadLocalGroups());
+    const onStorage = () => setLocalGroups(loadLocalGroups());
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const isActive = (view: ChatView) =>
     JSON.stringify(view) === JSON.stringify(activeView);
@@ -525,12 +562,19 @@ export default function ChatSidebar({
     setFriends(updated);
   };
 
-  const displayName = profile?.displayName || profile?.username || "You";
+  const displayName =
+    localProfile?.displayName ||
+    googleAuth.user?.name ||
+    profile?.displayName ||
+    profile?.username ||
+    "You";
   const avatarLetter = displayName[0]?.toUpperCase() || "U";
-  let profilePicUrl = "";
-  try {
-    profilePicUrl = profile?.profilePic?.getDirectURL?.() || "";
-  } catch {}
+  let profilePicUrl = localProfile?.picture || googleAuth.user?.picture || "";
+  if (!profilePicUrl) {
+    try {
+      profilePicUrl = profile?.profilePic?.getDirectURL?.() || "";
+    } catch {}
+  }
 
   const totalUnread =
     FAKE_DMS.reduce((s, d) => s + d.unread, 0) +
@@ -643,6 +687,10 @@ export default function ChatSidebar({
                   type: "group",
                   groupName: group.name,
                 });
+                const groupPhoto =
+                  localStorage.getItem(`groupPhoto_${group.name}`) ||
+                  localStorage.getItem(`sinzhu_group_photo_${group.name}`) ||
+                  null;
                 return (
                   <button
                     key={group.name}
@@ -666,10 +714,22 @@ export default function ChatSidebar({
                   >
                     <div className="relative flex-shrink-0">
                       <div
-                        className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-base"
-                        style={{ background: stringToColor(group.name) }}
+                        className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-base overflow-hidden"
+                        style={{
+                          background: groupPhoto
+                            ? undefined
+                            : stringToColor(group.name),
+                        }}
                       >
-                        {group.name[0]?.toUpperCase()}
+                        {groupPhoto ? (
+                          <img
+                            src={groupPhoto}
+                            alt={group.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          group.name[0]?.toUpperCase()
+                        )}
                       </div>
                       <span
                         className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
@@ -989,7 +1049,7 @@ export default function ChatSidebar({
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm" style={{ color: "#e8f4fd" }}>
-                {identity ? displayName : "Guest"}
+                {identity || googleAuth.user ? displayName : "Guest"}
               </p>
               <p className="text-xs" style={{ color: "#5288c1" }}>
                 My Profile

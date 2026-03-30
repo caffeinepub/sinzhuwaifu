@@ -17,7 +17,7 @@ import { useInternetIdentity } from "./useInternetIdentity";
 export type { Ad };
 
 export function useWaifuCharacters() {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery<WaifuCharacter[]>({
     queryKey: ["waifuCharacters"],
     queryFn: async () => {
@@ -30,16 +30,19 @@ export function useWaifuCharacters() {
       } catch {
         // fallback to localStorage only
       }
-      // Merge deduplicated by id
+      // Merge deduplicated by id — localStorage waifus take priority
       const merged = [...backendWaifus];
       for (const lsW of lsWaifus) {
         if (!merged.find((w) => w.id === lsW.id)) {
           merged.push(lsW);
         }
       }
+      // Persist merged back to localStorage so they survive
+      localStorage.setItem("sinzhu_waifus", JSON.stringify(merged));
       return merged;
     },
-    enabled: !!actor && !isFetching,
+    // Always enabled — reads from localStorage even without actor
+    enabled: true,
     refetchInterval: 5000,
   });
 }
@@ -154,6 +157,10 @@ export function useAddWaifuCharacter() {
       await actor.addWaifuCharacter(waifu);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["waifuCharacters"] });
+    },
+    onError: () => {
+      // Even if backend fails, invalidate so localStorage version is shown
       queryClient.invalidateQueries({ queryKey: ["waifuCharacters"] });
     },
   });
@@ -400,6 +407,9 @@ export function useDeleteWaifuCharacter() {
       await actor.deleteWaifuCharacter(id);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["waifuCharacters"] });
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: ["waifuCharacters"] });
     },
   });
