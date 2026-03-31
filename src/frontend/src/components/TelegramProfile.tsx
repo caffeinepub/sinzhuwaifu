@@ -22,41 +22,12 @@ import {
   useSaveProfile,
   useUserHarem,
 } from "../hooks/useQueries";
-import GoogleLoginModal from "./GoogleLoginModal";
 
+// BUG 1 & 2 FIX: Added onLogout prop
 interface TelegramProfileProps {
   onBack: () => void;
   onNavigate: (page: string) => void;
-}
-
-function GoogleColorIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 18 18"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label="Google"
-    >
-      <path
-        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
-        fill="#4285F4"
-      />
-      <path
-        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
-        fill="#34A853"
-      />
-      <path
-        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
+  onLogout?: () => void;
 }
 
 function getLocalProfile() {
@@ -67,7 +38,7 @@ function getLocalProfile() {
   }
 }
 
-function saveLocalProfile(data: Record<string, string>) {
+function saveLocalProfile(data: Record<string, unknown>) {
   try {
     const existing = getLocalProfile() || {};
     const merged = { ...existing, ...data };
@@ -78,11 +49,21 @@ function saveLocalProfile(data: Record<string, string>) {
   }
 }
 
+function getLocalAuth() {
+  try {
+    const stored = localStorage.getItem("sinzhu_local_auth");
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function TelegramProfile({
   onBack,
   onNavigate,
+  onLogout,
 }: TelegramProfileProps) {
-  const { identity, login, clear } = useInternetIdentity();
+  const { identity, clear } = useInternetIdentity();
   const googleAuth = useGoogleAuth();
   const { data: profile } = useCallerProfile();
   const { data: harem = [] } = useUserHarem(identity?.getPrincipal() ?? null);
@@ -99,7 +80,6 @@ export default function TelegramProfile({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [copiedPrincipal, setCopiedPrincipal] = useState(false);
   const [deletingPhoto, setDeletingPhoto] = useState(false);
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
   // localPic tracks uploaded photo immediately in state (for instant UI update)
   const [localPic, setLocalPic] = useState<string>(
     () => getLocalProfile()?.picture || "",
@@ -107,11 +87,15 @@ export default function TelegramProfile({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isGoogleUser = !!googleAuth.user;
-  const isLoggedIn = !!identity || !!googleAuth.user;
 
-  // Initialize form
+  // BUG 1 FIX: Include local auth users in isLoggedIn check
+  const localAuth = getLocalAuth();
+  const isLoggedIn = !!identity || !!googleAuth.user || !!localAuth;
+
+  // Initialize form — BUG 1 FIX: also handle localAuth users
   useEffect(() => {
     const local = getLocalProfile();
+    const la = getLocalAuth();
     if (identity && profile) {
       setForm({
         username: local?.username ?? profile.username,
@@ -130,6 +114,14 @@ export default function TelegramProfile({
       } else {
         setLocalPic(googleAuth.user.picture || "");
       }
+    } else if (la) {
+      // Local auth user
+      setForm({
+        username: local?.username || la.username || "",
+        displayName: local?.displayName || la.displayName || la.username || "",
+        bio: local?.bio || "",
+      });
+      if (local?.picture) setLocalPic(local.picture);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, identity, googleAuth.user]);
@@ -162,7 +154,7 @@ export default function TelegramProfile({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // For Google users or when no backend profile — save as base64 in localStorage
+    // For Google users, local auth users, or when no backend profile — save as base64 in localStorage
     if (!identity || !profile) {
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -231,6 +223,20 @@ export default function TelegramProfile({
     toast.success("Principal ID copied!");
   };
 
+  // BUG 2 FIX: Unified logout handler
+  const handleLogout = () => {
+    const la = getLocalAuth();
+    if (la) {
+      // Local auth user
+      localStorage.removeItem("sinzhu_local_auth");
+      onLogout?.();
+    } else if (isGoogleUser && !identity) {
+      googleAuth.logout();
+    } else {
+      clear();
+    }
+  };
+
   // Compute pic URL: prefer localPic (uploaded/from localStorage), then backend, then Google avatar
   let picUrl = localPic;
   if (!picUrl && identity && profile) {
@@ -241,7 +247,16 @@ export default function TelegramProfile({
 
   const displayName = form.displayName || form.username || "User";
   const avatarLetter = displayName[0]?.toUpperCase() ?? "U";
-  const coins = profile ? Number(profile.balance) : 0;
+  // Show Onex balance from localStorage for local auth users, coins from backend for II users
+  const localOnex = (() => {
+    try {
+      const p = getLocalProfile();
+      return p?.balance || 0;
+    } catch {
+      return 0;
+    }
+  })();
+  const coins = profile ? Number(profile.balance) : localOnex;
 
   return (
     <div
@@ -299,7 +314,7 @@ export default function TelegramProfile({
       </div>
 
       {!isLoggedIn ? (
-        /* ===== NOT LOGGED IN ===== */
+        /* ===== NOT LOGGED IN (should not happen with login gate, but fallback) ===== */
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -308,51 +323,23 @@ export default function TelegramProfile({
         >
           <div className="text-5xl">👤</div>
           <div className="flex flex-col items-center gap-1">
-            <p className="font-semibold text-white">Sign in to your profile</p>
+            <p className="font-semibold text-white">Aap logged in nahi hain</p>
             <p className="text-sm text-center" style={{ color: "#8eacbb" }}>
-              Customize your profile, collect waifus, and more
+              Pehle login karein
             </p>
           </div>
-
           <button
             type="button"
-            onClick={() => setShowGoogleModal(true)}
-            data-ocid="profile.google.button"
-            className="w-full flex items-center justify-center gap-3 rounded-xl py-3 font-semibold text-sm transition-all hover:shadow-lg active:scale-95"
-            style={{
-              background: "#ffffff",
-              color: "#3c4043",
-              maxWidth: 300,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-            }}
-          >
-            <GoogleColorIcon size={18} />
-            Continue with Google
-          </button>
-
-          <div
-            className="flex items-center gap-3 w-full"
-            style={{ maxWidth: 300 }}
-          >
-            <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
-            <span className="text-xs" style={{ color: "#4a6278" }}>
-              or
-            </span>
-            <div className="flex-1 h-px" style={{ background: "#2b3d54" }} />
-          </div>
-
-          <button
-            type="button"
-            onClick={login}
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 font-semibold text-sm transition-opacity hover:opacity-90 active:opacity-75"
+            onClick={onBack}
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold text-sm"
             style={{
               background: "#2481cc",
               color: "#ffffff",
               maxWidth: 300,
             }}
-            data-ocid="profile.login.button"
+            data-ocid="profile.back.button"
           >
-            🔑 Login with Internet Identity
+            ← Go Back
           </button>
         </motion.div>
       ) : (
@@ -442,12 +429,27 @@ export default function TelegramProfile({
                   border: "1px solid rgba(66,133,244,0.3)",
                 }}
               >
-                <GoogleColorIcon size={12} />
                 <span
                   className="text-xs font-semibold"
                   style={{ color: "#7db3f5" }}
                 >
                   Signed in with Google
+                </span>
+              </div>
+            )}
+            {localAuth && !isGoogleUser && !identity && (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                style={{
+                  background: "rgba(82,136,193,0.15)",
+                  border: "1px solid rgba(82,136,193,0.3)",
+                }}
+              >
+                <span
+                  className="text-xs font-semibold"
+                  style={{ color: "#7db3f5" }}
+                >
+                  🔑 @{localAuth.username}
                 </span>
               </div>
             )}
@@ -542,7 +544,7 @@ export default function TelegramProfile({
               </div>
             </div>
 
-            {/* Save button when editing (also in header, but easier to see here) */}
+            {/* Save button when editing */}
             {editing && (
               <button
                 type="button"
@@ -555,33 +557,44 @@ export default function TelegramProfile({
               </button>
             )}
 
-            {/* Stats */}
-            {identity && (
-              <div className="grid grid-cols-2 gap-2">
-                <div
-                  className="rounded-xl px-4 py-3"
-                  style={{ background: "#182533", border: "1px solid #2b3d54" }}
-                >
-                  <p className="text-xs" style={{ color: "#4a6278" }}>
-                    Balance
-                  </p>
-                  <p className="text-sm font-bold" style={{ color: "#f0c040" }}>
-                    💛 {coins.toLocaleString()} Coins
-                  </p>
-                </div>
-                <div
-                  className="rounded-xl px-4 py-3"
-                  style={{ background: "#182533", border: "1px solid #2b3d54" }}
-                >
-                  <p className="text-xs" style={{ color: "#4a6278" }}>
-                    Harem
-                  </p>
-                  <p className="text-sm font-bold" style={{ color: "#e8f4fd" }}>
-                    💝 {harem.length} Waifus
-                  </p>
-                </div>
+            {/* Balance stats */}
+            <div className="grid grid-cols-2 gap-2">
+              <div
+                className="rounded-xl px-4 py-3"
+                style={{ background: "#182533", border: "1px solid #2b3d54" }}
+              >
+                <p className="text-xs" style={{ color: "#4a6278" }}>
+                  Balance
+                </p>
+                <p className="text-sm font-bold" style={{ color: "#f0c040" }}>
+                  💰 {coins.toLocaleString()} Onex
+                </p>
               </div>
-            )}
+              <div
+                className="rounded-xl px-4 py-3"
+                style={{ background: "#182533", border: "1px solid #2b3d54" }}
+              >
+                <p className="text-xs" style={{ color: "#4a6278" }}>
+                  Harem
+                </p>
+                <p className="text-sm font-bold" style={{ color: "#e8f4fd" }}>
+                  💝{" "}
+                  {harem.length ||
+                    (() => {
+                      try {
+                        return (
+                          JSON.parse(
+                            localStorage.getItem("sinzhu_harem_global") || "[]",
+                          ).length || 0
+                        );
+                      } catch {
+                        return 0;
+                      }
+                    })()}{" "}
+                  Waifus
+                </p>
+              </div>
+            </div>
 
             {/* Google user email */}
             {isGoogleUser && googleAuth.user && (
@@ -711,10 +724,10 @@ export default function TelegramProfile({
               </button>
             )}
 
-            {/* Logout */}
+            {/* BUG 2 FIX: Unified logout button */}
             <button
               type="button"
-              onClick={isGoogleUser && !identity ? googleAuth.logout : clear}
+              onClick={handleLogout}
               className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:brightness-110"
               style={{
                 background: "rgba(193,82,82,0.15)",
@@ -743,15 +756,6 @@ export default function TelegramProfile({
           </a>
         </p>
       </div>
-
-      <GoogleLoginModal
-        open={showGoogleModal}
-        onClose={() => setShowGoogleModal(false)}
-        onSuccess={() => {
-          setShowGoogleModal(false);
-          onBack();
-        }}
-      />
     </div>
   );
 }

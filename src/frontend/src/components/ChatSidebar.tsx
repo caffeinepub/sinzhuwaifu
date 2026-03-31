@@ -551,6 +551,17 @@ export default function ChatSidebar({
   };
 
   const handleAddFriendToGroup = (friend: LocalFriend, grpName: string) => {
+    // BUG 16 FIX: Actually add the friend to the group members list
+    try {
+      const membersKey = `sinzhu_group_members_${grpName}`;
+      const members: string[] = JSON.parse(
+        localStorage.getItem(membersKey) || "[]",
+      );
+      if (!members.includes(friend.username)) {
+        members.push(friend.username);
+        localStorage.setItem(membersKey, JSON.stringify(members));
+      }
+    } catch {}
     toast.success(`@${friend.username} added to group "${grpName}"!`);
     setShowAddToGroupModal(false);
     setAddToGroupFriend(null);

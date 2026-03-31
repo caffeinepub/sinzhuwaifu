@@ -1515,6 +1515,51 @@ export default function ChatWindow({
   const [localEditedMsgs, setLocalEditedMsgs] = useState<Map<string, string>>(
     new Map(),
   );
+
+  // BUG 11 FIX: Load persisted deleted/edited msgs from localStorage when group changes
+  useEffect(() => {
+    const storageKey = groupName ?? "dm";
+    try {
+      const deleted = localStorage.getItem(`sinzhu_deleted_${storageKey}`);
+      setLocalDeletedMsgIds(new Set(deleted ? JSON.parse(deleted) : []));
+    } catch {}
+    try {
+      const edited = localStorage.getItem(`sinzhu_edited_${storageKey}`);
+      setLocalEditedMsgs(
+        edited ? new Map(Object.entries(JSON.parse(edited))) : new Map(),
+      );
+    } catch {}
+  }, [groupName]);
+
+  // BUG 11 FIX: Helper to persist a deleted message id
+  const persistDeleteMsg = (msgId: string) => {
+    const storageKey = groupName ?? "dm";
+    setLocalDeletedMsgIds((prev) => {
+      const next = new Set([...prev, msgId]);
+      try {
+        localStorage.setItem(
+          `sinzhu_deleted_${storageKey}`,
+          JSON.stringify([...next]),
+        );
+      } catch {}
+      return next;
+    });
+  };
+
+  // BUG 11 FIX: Helper to persist an edited message
+  const persistEditMsg = (msgId: string, newContent: string) => {
+    const storageKey = groupName ?? "dm";
+    setLocalEditedMsgs((prev) => {
+      const next = new Map([...prev, [msgId, newContent]]);
+      try {
+        localStorage.setItem(
+          `sinzhu_edited_${storageKey}`,
+          JSON.stringify(Object.fromEntries(next)),
+        );
+      } catch {}
+      return next;
+    });
+  };
   const [showInfo, setShowInfo] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
   const [spawnedWaifu, setSpawnedWaifu] = useState<WaifuCharacter | null>(null);
@@ -1546,6 +1591,9 @@ export default function ChatWindow({
   const [friends] = useState<LocalFriend[]>(loadFriends);
   const [isRecording, setIsRecording] = useState(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  // BUG 6 FIX: Add MediaRecorder and audio chunks refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derive my username from localStorage profile
@@ -1738,7 +1786,7 @@ export default function ChatWindow({
         waifu ?? waifuPool[Math.floor(Math.random() * waifuPool.length)];
       setSpawnedWaifu(spawned);
       addBotMessage(
-        "🌸 A wild waifu appeared! Quick, type /hunt to claim her before someone else does!",
+        `A New ${spawned.rarity} SealWaifu💫 Appeared... /hunt ${spawned.name} and add in Your Sealwaifu Collection 👾`,
         spawned,
         true,
       );
@@ -1746,7 +1794,7 @@ export default function ChatWindow({
       const spawned = waifuPool[Math.floor(Math.random() * waifuPool.length)];
       setSpawnedWaifu(spawned);
       addBotMessage(
-        "🌸 A wild waifu appeared! Quick, type /hunt to claim her before someone else does!",
+        `A New ${spawned.rarity} SealWaifu💫 Appeared... /hunt ${spawned.name} and add in Your Sealwaifu Collection 👾`,
         spawned,
         true,
       );
@@ -1852,49 +1900,88 @@ export default function ChatWindow({
 
   const handleMicClick = async () => {
     if (isRecording) {
-      // Stop recording
-      if (mediaStreamRef.current) {
-        for (const track of mediaStreamRef.current.getTracks()) track.stop();
-        mediaStreamRef.current = null;
+      // BUG 6 FIX: Stop MediaRecorder and assemble audio blob
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "inactive"
+      ) {
+        mediaRecorderRef.current.stop();
       }
       setIsRecording(false);
-      const localProfile2 = (() => {
-        try {
-          const r = localStorage.getItem("sinzhu_profile");
-          return r ? JSON.parse(r) : null;
-        } catch {
-          return null;
-        }
-      })();
-      const voiceUsername =
-        myPrincipal?.toString().slice(0, 8) ??
-        localProfile2?.username ??
-        localProfile2?.displayName ??
-        "Collector";
-      const voiceMsg: BotMessage = {
-        id: `voice-${Date.now()}-${Math.random()}`,
-        content: "🎤 Voice message",
-        timestamp: Date.now(),
-        isUserMessage: true,
-        isOwn: true,
-        senderName: voiceUsername,
-        mediaType: "voice",
-      };
-      setBotMessages((prev) => [...prev, voiceMsg]);
-      msgCountRef.current += 1;
-      const botMsg2 =
-        BOT_CASUAL_MESSAGES[
-          Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
-        ];
-      setTimeout(() => addBotMessage(botMsg2), 800);
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
         mediaStreamRef.current = stream;
+        audioChunksRef.current = [];
+
+        // BUG 6 FIX: Use MediaRecorder to capture actual audio data
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/ogg")
+            ? "audio/ogg"
+            : "";
+        const recorder = new MediaRecorder(
+          stream,
+          mimeType ? { mimeType } : undefined,
+        );
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          for (const track of stream.getTracks()) track.stop();
+          mediaStreamRef.current = null;
+
+          const localProfile2 = (() => {
+            try {
+              const r = localStorage.getItem("sinzhu_profile");
+              return r ? JSON.parse(r) : null;
+            } catch {
+              return null;
+            }
+          })();
+          const voiceUsername =
+            myPrincipal?.toString().slice(0, 8) ??
+            localProfile2?.username ??
+            localProfile2?.displayName ??
+            "Collector";
+
+          const blob = new Blob(audioChunksRef.current, {
+            type: mimeType || "audio/webm",
+          });
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            const voiceMsg: BotMessage = {
+              id: `voice-${Date.now()}-${Math.random()}`,
+              content: "\ud83c\udfa4 Voice message",
+              timestamp: Date.now(),
+              isUserMessage: true,
+              isOwn: true,
+              senderName: voiceUsername,
+              mediaType: "voice",
+              mediaUrl: dataUrl,
+            };
+            setBotMessages((prev) => [...prev, voiceMsg]);
+            msgCountRef.current += 1;
+            const botMsg2 =
+              BOT_CASUAL_MESSAGES[
+                Math.floor(Math.random() * BOT_CASUAL_MESSAGES.length)
+              ];
+            setTimeout(() => addBotMessage(botMsg2), 800);
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        recorder.start();
         setIsRecording(true);
-        toast("🎤 Recording... tap again to stop", {
+        toast("\ud83c\udfa4 Recording... tap again to stop", {
           duration: 3000,
           style: {
             background: "#1c2733",
@@ -1904,7 +1991,7 @@ export default function ChatWindow({
         });
       } catch {
         toast.error(
-          "❌ Mic access denied. Please allow microphone permission.",
+          "\u274c Mic access denied. Please allow microphone permission.",
         );
       }
     }
@@ -1989,6 +2076,22 @@ export default function ChatWindow({
                 } catch {}
                 return updated;
               });
+              // BUG 10 FIX: Actually add 50 Onex to userOnex and sync to profile
+              try {
+                const currentOnex = Number.parseInt(
+                  localStorage.getItem("userOnex") || "0",
+                  10,
+                );
+                localStorage.setItem("userOnex", String(currentOnex + 50));
+                const profileData = JSON.parse(
+                  localStorage.getItem("sinzhu_profile") || "{}",
+                );
+                profileData.balance = (profileData.balance || 0) + 50;
+                localStorage.setItem(
+                  "sinzhu_profile",
+                  JSON.stringify(profileData),
+                );
+              } catch {}
               toast.success("+50 Onex earned! 💰", { duration: 2000 });
             }
             if (onNavigate) {
@@ -2109,8 +2212,12 @@ export default function ChatWindow({
         }
 
         case "/onex": {
-          const bal = 100;
-          toast.info(`💸 Your Onex balance: ${bal} Onex`);
+          // BUG 8 FIX: Read from localStorage userOnex
+          const onexBal = Number.parseInt(
+            localStorage.getItem("userOnex") || "0",
+            10,
+          );
+          toast.info(`💰 Tumhara Onex balance: ${onexBal} 💎`);
           return;
         }
 
@@ -2179,7 +2286,8 @@ export default function ChatWindow({
             toast.error("❌ Usage: /check [waifu-id or name]");
             return;
           }
-          const found = SEED_WAIFUS.find(
+          // BUG 9 FIX: Search both SEED_WAIFUS and uploadedWaifus
+          const found = [...SEED_WAIFUS, ...uploadedWaifus].find(
             (w) =>
               w.id === arg || w.name.toLowerCase().includes(arg.toLowerCase()),
           );
@@ -2832,7 +2940,32 @@ export default function ChatWindow({
                                 "sinzhu_harem_global",
                                 JSON.stringify(newIds),
                               );
-                              toast.success("Waifu sold! 💸");
+                              // BUG 12 FIX: Give Onex based on rarity
+                              const sellPrice =
+                                RARITY_SELL_PRICES[waifu.rarity] ?? 10;
+                              try {
+                                const currentOnex = Number.parseInt(
+                                  localStorage.getItem("userOnex") || "0",
+                                  10,
+                                );
+                                localStorage.setItem(
+                                  "userOnex",
+                                  String(currentOnex + sellPrice),
+                                );
+                                const profileData = JSON.parse(
+                                  localStorage.getItem("sinzhu_profile") ||
+                                    "{}",
+                                );
+                                profileData.balance =
+                                  (profileData.balance || 0) + sellPrice;
+                                localStorage.setItem(
+                                  "sinzhu_profile",
+                                  JSON.stringify(profileData),
+                                );
+                              } catch {}
+                              toast.success(
+                                `Waifu sold for ${sellPrice} Onex! 💸`,
+                              );
                             }}
                           >
                             💸 Sell
@@ -2991,9 +3124,8 @@ export default function ChatWindow({
                       onDelete={
                         isOwn
                           ? () => {
-                              setLocalDeletedMsgIds(
-                                (prev) => new Set([...prev, msgId]),
-                              );
+                              // BUG 11 FIX: persist delete
+                              persistDeleteMsg(msgId);
                             }
                           : undefined
                       }
@@ -3003,13 +3135,8 @@ export default function ChatWindow({
                       onEditSave={
                         isOwn
                           ? () => {
-                              setLocalEditedMsgs(
-                                (prev) =>
-                                  new Map([
-                                    ...prev,
-                                    [msgId, editingBotMsgText],
-                                  ]),
-                              );
+                              // BUG 11 FIX: persist edit
+                              persistEditMsg(msgId, editingBotMsgText);
                               setEditingBotMsgId(null);
                             }
                           : undefined
@@ -3048,9 +3175,8 @@ export default function ChatWindow({
                       onDelete={
                         isOwn
                           ? () => {
-                              setLocalDeletedMsgIds(
-                                (prev) => new Set([...prev, dmMsgId]),
-                              );
+                              // BUG 11 FIX: persist delete
+                              persistDeleteMsg(dmMsgId);
                             }
                           : undefined
                       }
@@ -3060,13 +3186,8 @@ export default function ChatWindow({
                       onEditSave={
                         isOwn
                           ? () => {
-                              setLocalEditedMsgs(
-                                (prev) =>
-                                  new Map([
-                                    ...prev,
-                                    [dmMsgId, editingBotMsgText],
-                                  ]),
-                              );
+                              // BUG 11 FIX: persist edit
+                              persistEditMsg(dmMsgId, editingBotMsgText);
                               setEditingBotMsgId(null);
                             }
                           : undefined

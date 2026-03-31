@@ -45,7 +45,10 @@ export default function Admin({ onNavigate }: AdminProps) {
   const deleteAd = useDeleteAd();
 
   const queryClient = useQueryClient();
-  const [unlocked, setUnlocked] = useState(false);
+  // BUG 13 FIX: Persist admin unlock state in localStorage
+  const [unlocked, setUnlocked] = useState(
+    () => localStorage.getItem("sinzhu_admin_unlocked") === "true",
+  );
   const [adsEnabled, setAdsEnabled] = useState(() => {
     return localStorage.getItem("sinzhu_ads_enabled") !== "false";
   });
@@ -53,6 +56,8 @@ export default function Admin({ onNavigate }: AdminProps) {
     const newVal = !adsEnabled;
     setAdsEnabled(newVal);
     localStorage.setItem("sinzhu_ads_enabled", String(newVal));
+    // BUG 14 FIX: Dispatch event so App.tsx updates in real time
+    window.dispatchEvent(new Event("sinzhu_ads_changed"));
     toast.success(
       newVal
         ? "Ads enabled! Popup will show on app open."
@@ -254,6 +259,12 @@ export default function Admin({ onNavigate }: AdminProps) {
   };
 
   const handleDeleteAd = async (id: string, title: string) => {
+    // BUG 15 FIX: Always delete from localStorage too
+    try {
+      const localAds = JSON.parse(localStorage.getItem("sinzhu_ads") || "[]");
+      const filtered = localAds.filter((a: { id: string }) => a.id !== id);
+      localStorage.setItem("sinzhu_ads", JSON.stringify(filtered));
+    } catch {}
     try {
       await deleteAd.mutateAsync(id);
       toast.success(`Ad "${title}" deleted.`);

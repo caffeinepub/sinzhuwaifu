@@ -9,6 +9,14 @@ interface CouponPageProps {
   onNavigate: (page: string) => void;
 }
 
+function syncOnexToProfile(amount: number) {
+  try {
+    const profile = JSON.parse(localStorage.getItem("sinzhu_profile") || "{}");
+    profile.balance = (profile.balance || 0) + amount;
+    localStorage.setItem("sinzhu_profile", JSON.stringify(profile));
+  } catch {}
+}
+
 export default function CouponPage({ onNavigate }: CouponPageProps) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,6 +50,8 @@ export default function CouponPage({ onNavigate }: CouponPageProps) {
         10,
       );
       localStorage.setItem("userOnex", String(current + coupon.onex));
+      // BUG 5 FIX: Sync to sinzhu_profile.balance
+      syncOnexToProfile(coupon.onex);
       coupons[idx].usedBy = [...coupon.usedBy, userId];
       localStorage.setItem("sinzhu_coupons", JSON.stringify(coupons));
       toast.success(`✅ You got ${coupon.onex} onex!`);

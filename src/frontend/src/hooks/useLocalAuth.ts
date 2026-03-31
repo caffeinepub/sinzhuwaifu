@@ -42,12 +42,18 @@ export function useLocalAuth() {
         displayName: username,
       };
       localStorage.setItem(AUTH_KEY, JSON.stringify(newUser));
+      // BUG 3 FIX: Set sinzhu_userId if not already set
+      if (!localStorage.getItem("sinzhu_userId")) {
+        const userId = Math.random().toString(36).substr(2, 8).toUpperCase();
+        localStorage.setItem("sinzhu_userId", userId);
+      }
       // Also set sinzhu_profile
       const profile = {
         username,
         displayName: username,
         bio: "",
         picture: "",
+        balance: 0,
       };
       localStorage.setItem("sinzhu_profile", JSON.stringify(profile));
       setUser(newUser);
@@ -59,6 +65,7 @@ export function useLocalAuth() {
   const resetUser = useCallback(() => {
     localStorage.removeItem(AUTH_KEY);
     localStorage.removeItem("sinzhu_profile");
+    localStorage.removeItem("sinzhu_userId");
     setUser(null);
   }, []);
 

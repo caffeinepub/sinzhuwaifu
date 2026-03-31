@@ -143,9 +143,24 @@ export default function App() {
   );
 
   const { data: ads = [] } = useAds();
-  const [adsEnabledState] = useState(
+  const [adsEnabledState, setAdsEnabledState] = useState(
     () => localStorage.getItem("sinzhu_ads_enabled") !== "false",
   );
+
+  // BUG 14 FIX: Listen for ads toggle event from Admin panel
+  useEffect(() => {
+    const handleAdsChange = () => {
+      setAdsEnabledState(
+        localStorage.getItem("sinzhu_ads_enabled") !== "false",
+      );
+    };
+    window.addEventListener("sinzhu_ads_changed", handleAdsChange);
+    window.addEventListener("storage", handleAdsChange);
+    return () => {
+      window.removeEventListener("sinzhu_ads_changed", handleAdsChange);
+      window.removeEventListener("storage", handleAdsChange);
+    };
+  }, []);
   const [adPopupDismissed, setAdPopupDismissed] = useState(() => {
     return sessionStorage.getItem("sinzhu_ad_popup_shown") === "true";
   });
@@ -200,7 +215,11 @@ export default function App() {
   const renderMainPanel = () => {
     if (activeView.type === "profile") {
       return (
-        <TelegramProfile onBack={handleBack} onNavigate={handleNavigate} />
+        <TelegramProfile
+          onBack={handleBack}
+          onNavigate={handleNavigate}
+          onLogout={() => setLoggedIn(false)}
+        />
       );
     }
 

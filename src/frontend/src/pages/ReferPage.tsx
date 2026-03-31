@@ -2,19 +2,53 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Copy } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 interface ReferPageProps {
   onNavigate: (page: string) => void;
 }
 
+function syncOnexToProfile(amount: number) {
+  try {
+    const profile = JSON.parse(localStorage.getItem("sinzhu_profile") || "{}");
+    profile.balance = (profile.balance || 0) + amount;
+    localStorage.setItem("sinzhu_profile", JSON.stringify(profile));
+  } catch {}
+}
+
 export default function ReferPage({ onNavigate }: ReferPageProps) {
-  const userId = localStorage.getItem("sinzhu_userId") || "GUEST";
-  const myReferCode = userId.toUpperCase().slice(0, 6).padEnd(6, "X");
+  // BUG 4 FIX: Use sinzhu_userId for a stable, unique refer code
+  const userId = localStorage.getItem("sinzhu_userId") || "";
+  const myReferCode = userId
+    ? userId.slice(0, 6).toUpperCase().padEnd(6, "0")
+    : "XXXXXX";
 
   const [friendCode, setFriendCode] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // BUG 4 FIX: Check for pending referral rewards on mount
+  useEffect(() => {
+    if (!myReferCode || myReferCode === "XXXXXX") return;
+    try {
+      const rewards: Record<string, number> = JSON.parse(
+        localStorage.getItem("sinzhu_refer_rewards") || "{}",
+      );
+      const pending = rewards[myReferCode] || 0;
+      if (pending > 0) {
+        const current = Number.parseInt(
+          localStorage.getItem("userOnex") || "0",
+          10,
+        );
+        localStorage.setItem("userOnex", String(current + pending));
+        syncOnexToProfile(pending);
+        // Clear the pending reward
+        rewards[myReferCode] = 0;
+        localStorage.setItem("sinzhu_refer_rewards", JSON.stringify(rewards));
+        toast.success(`🎉 You earned ${pending} Onex from referrals!`);
+      }
+    } catch {}
+  }, [myReferCode]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(myReferCode).then(() => {
@@ -41,11 +75,21 @@ export default function ReferPage({ onNavigate }: ReferPageProps) {
         setLoading(false);
         return;
       }
+      // BUG 4 + 5 FIX: Give claimer 300 Onex + sync to profile
       const current = Number.parseInt(
         localStorage.getItem("userOnex") || "0",
         10,
       );
       localStorage.setItem("userOnex", String(current + 300));
+      syncOnexToProfile(300);
+
+      // Store 300 Onex reward for the referrer (they collect when they open ReferPage)
+      const rewards: Record<string, number> = JSON.parse(
+        localStorage.getItem("sinzhu_refer_rewards") || "{}",
+      );
+      rewards[trimmed] = (rewards[trimmed] || 0) + 300;
+      localStorage.setItem("sinzhu_refer_rewards", JSON.stringify(rewards));
+
       used.push(trimmed);
       localStorage.setItem("sinzhu_refer_used", JSON.stringify(used));
       toast.success("✅ You got 300 onex!");
